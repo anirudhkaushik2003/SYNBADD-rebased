@@ -1,0 +1,29 @@
+Metadata-Version: 2.4
+Name: synbadd
+Version: 1.0.0
+Summary: SYNBADD: Longitudinal 3D T1 MRI synthesis with stationary velocity fields
+Requires-Python: >=3.9
+Requires-Dist: torch>=1.13
+Requires-Dist: torchvision
+Requires-Dist: numpy>=1.23
+Requires-Dist: pandas
+Requires-Dist: nibabel
+Requires-Dist: monai>=1.0
+Requires-Dist: omegaconf>=2.3
+Requires-Dist: click>=8.0
+Requires-Dist: wandb>=0.15
+Requires-Dist: scipy
+Requires-Dist: scikit-image
+Requires-Dist: scikit-learn
+Requires-Dist: matplotlib
+Requires-Dist: seaborn
+Requires-Dist: pytorch-msssim
+Requires-Dist: voxelmorph>=0.2
+Requires-Dist: neurite>=0.2
+Requires-Dist: colorama
+Requires-Dist: tqdm
+Provides-Extra: sweep
+Requires-Dist: hydra-core>=1.3; extra == "sweep"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
