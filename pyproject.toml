@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synbadd"
+version = "1.0.0"
+description = "SYNBADD: Longitudinal 3D T1 MRI synthesis with stationary velocity fields"
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=1.13",
+    "torchvision",
+    "numpy>=1.23",
+    "pandas",
+    "nibabel",
+    "monai>=1.0",
+    "omegaconf>=2.3",
+    "click>=8.0",
+    "wandb>=0.15",
+    "scipy",
+    "scikit-image",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "pytorch-msssim",
+    "voxelmorph>=0.2",
+    "neurite>=0.2",
+    "colorama",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+sweep = ["hydra-core>=1.3"]
+dev = ["pytest>=7.0", "ruff"]
+
+[project.scripts]
+synbadd = "synbadd.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["synbadd*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

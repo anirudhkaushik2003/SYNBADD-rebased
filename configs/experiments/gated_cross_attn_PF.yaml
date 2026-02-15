@@ -1,0 +1,13 @@
+_base_: ../base.yaml
+
+model:
+  temporal:
+    type: GatedCrossAttention
+    use_positional_embeddings: true
+
+data:
+  use_past_data: true
+  use_future_data: true
+
+wandb:
+  project: SYNBADD_GatedCrossAttn_PF

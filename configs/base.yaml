@@ -1,0 +1,98 @@
+model:
+  img_height: 128
+  latent_dim: 512
+  c_dim: 3
+  in_channels: 3
+
+  generator:
+    type: SVFRegressorDiffeoGenerator
+    nb_unet_features:
+      - [16, 32, 32, 32, 32]
+      - [32, 32, 32, 32, 32, 32, 16, 16]
+    int_steps: 10
+    int_downsize: 1
+    using_daft: true
+    using_unet: true
+    use_deformation_field: true
+
+  temporal:
+    type: GatedCrossAttention
+    num_heads: 8
+    num_layers: 2
+    max_seq_len: 5
+    use_positional_embeddings: true
+    use_bidirectional_embeddings: false
+
+  discriminator:
+    enabled: false
+    type: DAFTDiscriminator
+    channel_number: [32, 64, 128, 256, 64]
+
+  vae:
+    type: VAE3D_UNetSkip
+    frozen: true
+
+training:
+  n_epochs: 200
+  batch_size: 6
+  effective_batch_size: 6
+  lr: 5.0e-5
+  betas: [0.5, 0.999]
+  patience: 5
+  early_stopping_patience: 7
+  min_lr: 1.0e-6
+  aug_p: 0.0
+
+  loss:
+    ssim: 0.2
+    lddmm: 0.5
+    jacobian: 0.1
+    jac_dist: 0.05
+    smooth: 0.05
+    disc: 0.05
+    epe_x: 0.0
+    epe_y: 0.0
+    epe_z: 0.0
+    angular: 0.0
+
+data:
+  dataset: ADNI
+  fold: 1
+  target_timepoint: all
+  timepoints: [sc, m06, m12, m18, m24, m36]
+  svf_type: baseline
+  warp_baseline: true
+  use_past_data: true
+  use_future_data: true
+  use_val_dataset: true
+
+paths:
+  base_dir: /scratch/anirudhkaushik
+  # All other paths are auto-derived from base_dir in PathsConfig.resolve_defaults()
+  # Override individual paths here if needed:
+  # csv_file: /custom/path/to/splits.csv
+  # vae_checkpoint: /custom/path/to/vae.pth
+
+system:
+  n_gpu: 2
+  n_cpu: 3
+  seed: 42
+  debug: false
+
+wandb:
+  enabled: true
+  project: SYNBADD_Experiments
+
+eval:
+  baselines:
+    - noder
+    - remind
+  roi_regions:
+    hippocampus: [17, 53]
+    amygdala: [18, 54]
+    entorhinal_cortex: [1006, 2006]
+    parahippocampal: [1016, 2016]
+    fusiform_gyrus: [1007, 2007]
+    inferior_temporal_gyrus: [1009, 2009]
+    middle_temporal_gyrus: [1015, 2015]
+    third_ventricle: [14]

@@ -1,3 +1,15 @@
-torch-lddmm/
 __pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
 wandb/
+outputs/
+multirun/
+.hydra/
+*.pth
+*.nii.gz
+*.nii
+.env
