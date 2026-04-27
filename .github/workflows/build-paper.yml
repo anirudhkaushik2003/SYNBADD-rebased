@@ -16,16 +16,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate elsarticle.cls from .dtx
-        working-directory: paper
-        run: latex elsarticle.ins
-
       - name: Compile LaTeX document
         uses: xu-cheng/latex-action@v3
         with:
           working_directory: paper
           root_file: SynBADD.tex
           latexmk_use_lualatex: false
+          pre_compile: latex elsarticle.ins
           args: -pdf -interaction=nonstopmode -file-line-error
 
       - name: Upload PDF artifact
