@@ -1,0 +1,13 @@
+_base_: ../base.yaml
+
+model:
+  temporal:
+    type: CrossAttentionTransformer
+  generator:
+    using_daft: false
+    using_unet: false
+  discriminator:
+    enabled: false
+
+paths:
+  output_dir: /scratch/anirudhkaushik

@@ -3,8 +3,12 @@
 from synbadd.evaluation.base_evaluator import BaseEvaluator  # noqa: F401
 
 
-def build_evaluator(comparison_type: str, cfg):
-    """Factory to create the appropriate evaluator."""
+def build_evaluator(comparison_type: str, cfg, **kwargs):
+    """Factory to create the appropriate evaluator.
+
+    Extra kwargs are forwarded to the evaluator constructor.
+    For ablation comparisons, pass run_names and variant_labels.
+    """
     _EVALUATORS = {
         "noder": "synbadd.evaluation.noder_comparison.NODERComparison",
         "remind": "synbadd.evaluation.remind_comparison.ReMiNDComparison",
@@ -20,4 +24,4 @@ def build_evaluator(comparison_type: str, cfg):
     import importlib
     module = importlib.import_module(module_path)
     cls = getattr(module, class_name)
-    return cls(cfg, fold=cfg.data.fold)
+    return cls(cfg, fold=cfg.data.fold, **kwargs)

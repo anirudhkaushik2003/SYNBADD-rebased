@@ -275,8 +275,29 @@ class SVFRegressorDiffeoGenerator(nn.Module):
             condition: Conditioning vector for DAFT [B, c_dim]
             registration: If True, return integrated flow instead of pre-integration flow
         """
-        pos_flow = self.projection_layer(contextualized_scan)
-        preint_flow = contextualized_scan
+        if self.using_unet:
+            # UNet path: refine contextualized scan into a flow field
+            if self.using_daft:
+                shape = self.unet_model(contextualized_scan, condition)
+            else:
+                shape = self.unet_model(contextualized_scan)
+
+            flow_field = self.flow(shape)
+
+            pos_flow = flow_field
+            if self.resize:
+                pos_flow = self.resize(pos_flow)
+
+            preint_flow = pos_flow
+
+            if self.integrate:
+                pos_flow = self.integrate(pos_flow)
+                if self.fullsize:
+                    pos_flow = self.fullsize(pos_flow)
+        else:
+            # Simple projection path (no UNet)
+            pos_flow = self.projection_layer(contextualized_scan)
+            preint_flow = contextualized_scan
 
         # Warp source image
         y_source = self.transformer(source, pos_flow)

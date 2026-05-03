@@ -20,7 +20,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from synbadd.engine.checkpoint import CheckpointManager, strip_module_prefix
+from synbadd.engine.checkpoint import CheckpointManager, adapt_state_dict
 from synbadd.losses.similarity import compute_metrics
 from synbadd.models.registry import build_model
 
@@ -155,7 +155,7 @@ class Inferrer:
 
         self.vae_model = build_model("VAE3D_UNetSkip")
         sd = torch.load(cfg.paths.vae_checkpoint, map_location="cpu", weights_only=False)
-        sd = strip_module_prefix(sd)
+        sd = adapt_state_dict(sd, self.vae_model)
         self.vae_model.load_state_dict(sd)
         for p in self.vae_model.parameters():
             p.requires_grad = False
@@ -223,7 +223,7 @@ class Inferrer:
         )
         vxm_model.to(self.device)
         sd = torch.load(cfg.paths.vxm_checkpoint, map_location=self.device, weights_only=False)
-        sd = strip_module_prefix(sd)
+        sd = adapt_state_dict(sd, vxm_model)
         vxm_model.load_state_dict(sd)
         vxm_model.eval()
         for p in vxm_model.parameters():
@@ -296,6 +296,7 @@ class Inferrer:
 
         all_metrics = []
         tp_metrics = {tp: [] for tp in self.TIMEPOINTS}
+        subject_idx = 0
 
         with torch.no_grad():
             with tqdm(total=len(self.test_loader.dataset), desc=f"Inference ({method_label})") as pbar:
@@ -328,31 +329,40 @@ class Inferrer:
                         target_scan, y_synthetic, synthetic_field, self.lddmm_loss, device
                     )
 
-                    row = {
-                        "mse": mse, "psnr": psnr_val, "ssim": ssim_val,
-                        "mssim": mssim, "mean_jac": mean_jac, "std_jac": std_jac,
-                        "nrmse": nrmse, "epe": epe,
-                    }
-                    all_metrics.append(row)
-
-                    # Per-timepoint
-                    for b in range(target_timepoint_index.size(0)):
-                        tp_idx = target_timepoint_index[b].item()
-                        tp = self.timepoint_map.get(tp_idx + 1, "unknown")
-                        if tp in tp_metrics:
-                            tp_metrics[tp].append(row)
-
-                    # Save .nii.gz per subject
+                    # Per-subject metrics
                     for b in range(target_uid.size(0)):
                         uid = target_uid[b].item()
                         filepath = uid_to_filepath.get(uid)
+                        basename = os.path.basename(filepath) if filepath else f"subject_{uid}"
+                        tp_idx = target_timepoint_index[b].item()
+                        tp = self.timepoint_map.get(tp_idx + 1, "unknown")
+
+                        row = {
+                            "subject": basename,
+                            "timepoint": tp,
+                            "mse": mse, "psnr": psnr_val, "ssim": ssim_val,
+                            "mssim": mssim, "mean_jac": mean_jac, "std_jac": std_jac,
+                            "nrmse": nrmse, "epe": epe,
+                        }
+                        all_metrics.append(row)
+
+                        if tp in tp_metrics:
+                            tp_metrics[tp].append(row)
+
+                        # Log per-subject to W&B
+                        if wandb is not None:
+                            wandb.log(
+                                {f"Infer {k}": v for k, v in row.items() if k not in ("subject", "timepoint")},
+                                step=subject_idx,
+                            )
+                            subject_idx += 1
+
+                        # Save .nii.gz
                         if filepath is None:
                             continue
-                        basename = os.path.basename(filepath)
 
                         tp_label = self.timepoint_map.get(
-                            target_timepoint_index[b].item() + 1,
-                            cfg.data.target_timepoint,
+                            tp_idx + 1, cfg.data.target_timepoint,
                         )
                         syn_name = basename.replace(".nii.gz", f"_{tp_label}_synthetic.nii.gz")
                         field_name = basename.replace(".nii.gz", f"_{tp_label}_synthetic_field.nii.gz")
@@ -372,15 +382,31 @@ class Inferrer:
         # Save CSV
         self._save_csv(all_metrics, tp_metrics)
 
-        # W&B
-        if wandb is not None:
-            avg = {k: np.mean([r[k] for r in all_metrics]) for k in all_metrics[0]}
-            wandb.log({f"Infer {k}": v for k, v in avg.items()})
+        # W&B summary
+        if wandb is not None and all_metrics:
+            avg = {k: np.mean([r[k] for r in all_metrics])
+                   for k in all_metrics[0] if k not in ("subject", "timepoint")}
+            wandb.summary.update({f"Infer avg_{k}": v for k, v in avg.items()})
+
+            # Per-timepoint summary
+            for tp, rows in tp_metrics.items():
+                if rows:
+                    tp_avg = {k: np.mean([r[k] for r in rows])
+                              for k in rows[0] if k not in ("subject", "timepoint")}
+                    wandb.summary.update({f"Infer {tp}_avg_{k}": v for k, v in tp_avg.items()})
+
+            # Log full results as W&B Table
+            table = wandb.Table(
+                columns=["subject", "timepoint", "mse", "psnr", "ssim", "mssim", "nrmse", "epe"],
+                data=[[r["subject"], r["timepoint"], r["mse"], r["psnr"], r["ssim"],
+                       r["mssim"], r["nrmse"], r["epe"]] for r in all_metrics],
+            )
+            wandb.log({"Infer results": table})
             wandb.finish()
 
         n_subjects = len(all_metrics)
         avg_loss = np.mean([r["mse"] for r in all_metrics]) if all_metrics else 0.0
-        print(f"Inference ({method_label}) complete. {n_subjects} batches. Avg MSE: {avg_loss:.4f}")
+        print(f"Inference ({method_label}) complete. {n_subjects} subjects. Avg MSE: {avg_loss:.4f}")
         print(f"Outputs saved to {self.output_dir}")
         return {"n_subjects": n_subjects, "output_dir": self.output_dir, "avg_mse": avg_loss}
 
@@ -394,17 +420,26 @@ class Inferrer:
         )
         os.makedirs(save_dir, exist_ok=True)
 
-        avg = {k: np.mean([r[k] for r in all_metrics]) for k in all_metrics[0]}
+        numeric_keys = [k for k in all_metrics[0] if k not in ("subject", "timepoint")]
+        avg = {k: np.mean([r[k] for r in all_metrics]) for k in numeric_keys}
         for tp, rows in tp_metrics.items():
             if rows:
-                for k in rows[0]:
+                for k in numeric_keys:
                     avg[f"{tp}_{k}"] = np.mean([r[k] for r in rows])
 
-        df = pd.DataFrame([avg])
         label = "avg_impute" if self.method == "avg_impute" else self.cfg.run_name
+
+        # Per-subject CSV
+        per_subject_df = pd.DataFrame(all_metrics)
+        per_subject_path = os.path.join(save_dir, f"{label}_per_subject.csv")
+        per_subject_df.to_csv(per_subject_path, index=False)
+        print(f"Per-subject metrics saved to {per_subject_path}")
+
+        # Summary CSV
+        df = pd.DataFrame([avg])
         csv_path = os.path.join(save_dir, f"{label}_infer.csv")
         df.to_csv(csv_path, index=False)
-        print(f"Inference metrics saved to {csv_path}")
+        print(f"Summary metrics saved to {csv_path}")
 
     def _init_wandb(self, method_label):
         if self.cfg.system.debug or not self.cfg.wandb.enabled:

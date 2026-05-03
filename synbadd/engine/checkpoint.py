@@ -14,6 +14,53 @@ def strip_module_prefix(state_dict):
     return new_sd
 
 
+def add_module_prefix(state_dict):
+    """Add 'module.' prefix for loading into DataParallel-wrapped models."""
+    new_sd = OrderedDict()
+    for k, v in state_dict.items():
+        if not k.startswith("module."):
+            new_sd[f"module.{k}"] = v
+        else:
+            new_sd[k] = v
+    return new_sd
+
+
+def adapt_state_dict(state_dict, model):
+    """Automatically adapt state_dict keys to match the model.
+
+    Handles all four combinations:
+      - checkpoint has 'module.' prefix, model expects 'module.' (DataParallel) -> keep as-is
+      - checkpoint has 'module.' prefix, model expects bare keys -> strip prefix
+      - checkpoint has bare keys, model expects 'module.' (DataParallel) -> add prefix
+      - checkpoint has bare keys, model expects bare keys -> keep as-is
+    """
+    model_keys = set(model.state_dict().keys())
+    sd_keys = set(state_dict.keys())
+
+    # Already compatible
+    if model_keys == sd_keys:
+        return state_dict
+
+    # Try stripping module. prefix
+    stripped = strip_module_prefix(state_dict)
+    if set(stripped.keys()) == model_keys:
+        return stripped
+
+    # Try adding module. prefix
+    prefixed = add_module_prefix(state_dict)
+    if set(prefixed.keys()) == model_keys:
+        return prefixed
+
+    # Try stripping then adding (handles double module. or other edge cases)
+    re_prefixed = add_module_prefix(stripped)
+    if set(re_prefixed.keys()) == model_keys:
+        return re_prefixed
+
+    # Architecture mismatch: keys differ even after prefix adjustment.
+    # Return None to signal the caller to use strict=False loading.
+    return None
+
+
 class CheckpointManager:
     """Manages saving and loading of all model components.
 
@@ -64,8 +111,25 @@ class CheckpointManager:
                 print(f"Warning: checkpoint not found for {name}: {path}")
                 continue
             sd = torch.load(path, map_location=device, weights_only=False)
-            sd = strip_module_prefix(sd)
-            model.load_state_dict(sd)
+            adapted = adapt_state_dict(sd, model)
+            if adapted is None:
+                # Architecture mismatch — try adding module. prefix then load with strict=False
+                model_has_module = any(k.startswith("module.") for k in model.state_dict())
+                sd_has_module = any(k.startswith("module.") for k in sd)
+                if model_has_module and not sd_has_module:
+                    best_sd = add_module_prefix(sd)
+                elif not model_has_module and sd_has_module:
+                    best_sd = strip_module_prefix(sd)
+                else:
+                    best_sd = sd
+                missing, unexpected = model.load_state_dict(best_sd, strict=False)
+                if missing or unexpected:
+                    print(f"Warning: architecture mismatch loading '{name}' checkpoint.")
+                    print(f"  Missing  : {missing[:5]}{'...' if len(missing)>5 else ''}")
+                    print(f"  Unexpected: {unexpected[:5]}{'...' if len(unexpected)>5 else ''}")
+                    print("  Proceeding with partial load (strict=False).")
+            else:
+                model.load_state_dict(adapted)
 
     def exists(self, component="generator"):
         """Check if a checkpoint exists for a component."""

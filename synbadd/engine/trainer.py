@@ -8,7 +8,7 @@ import torch.nn as nn
 from tqdm import tqdm
 from voxelmorph.torch.networks import VxmDense
 
-from synbadd.engine.checkpoint import CheckpointManager, strip_module_prefix
+from synbadd.engine.checkpoint import CheckpointManager, adapt_state_dict
 from synbadd.engine.validator import Validator
 from synbadd.losses.composite import build_loss_fn
 from synbadd.losses.lddmm import VxmLDDMMLoss
@@ -110,7 +110,7 @@ class Trainer:
         """Load pretrained VAE and freeze all parameters."""
         vae = build_model("VAE3D_UNetSkip")
         sd = torch.load(self.cfg.paths.vae_checkpoint, map_location="cpu", weights_only=False)
-        sd = strip_module_prefix(sd)
+        sd = adapt_state_dict(sd, vae)
         vae.load_state_dict(sd)
         for param in vae.parameters():
             param.requires_grad = False
@@ -162,7 +162,7 @@ class Trainer:
         )
         vxm_model.to(self.device)
         sd = torch.load(cfg.paths.vxm_checkpoint, map_location=self.device, weights_only=False)
-        sd = strip_module_prefix(sd)
+        sd = adapt_state_dict(sd, vxm_model)
         vxm_model.load_state_dict(sd)
         vxm_model.eval()
         for p in vxm_model.parameters():
