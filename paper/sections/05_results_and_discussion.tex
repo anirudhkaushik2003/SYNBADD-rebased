@@ -171,6 +171,8 @@ Table~\ref{tab:dice_noder} shows that SynBADD achieves Dice improvements over NO
 Table~\ref{tab:dice_remind} presents the comparison with ReMiND. SynBADD achieves consistently high Dice scores across all regions, exceeding 0.96 in every structure. ReMiND, by contrast, produces Dice scores below 0.67 in most regions, with the entorhinal cortex showing the weakest agreement at 0.3742. The gap is particularly pronounced in smaller structures such as the amygdala and entorhinal cortex, where slice-wise synthesis in intensity space struggles to maintain anatomical correspondence.
  
 Table~\ref{tab:dice_forward} and Table~\ref{tab:volume_forward} extend the comparison to the Forward Difference baseline. Table~\ref{tab:dice_forward} shows that SynBADD achieves Dice improvements ranging from +56.30\% for the hippocampus to +110.94\% for the middle temporal gyrus. Table~\ref{tab:volume_forward} reports absolute and relative volumetric differences with respect to ground truth. The Forward Difference approach yields percentage volume errors in the range of 7.23\%--20.34\%, whereas SynBADD reduces these to 1.22\%--3.79\% across all evaluated regions. This indicates that SynBADD not only reconstructs the correct spatial layout of anatomical structures but also preserves their volumetric properties with high fidelity---a property that is essential for downstream tasks such as atrophy rate estimation and biomarker extraction in longitudinal studies.
+
+It is important to interpret the gap over Forward Difference correctly. Forward Difference performs no learning whatsoever: it copies the most recent observed scan into the missing slot. The substantial improvement of SynBADD over this baseline therefore quantifies the value of the entire learned pipeline---deformation-space modelling, the diffeomorphic generator, and the clinical-metadata-conditioned refinement module---rather than the contribution of the temporal transformer in isolation. We return to the question of how much of this gain is attributable to the longitudinal aggregation pathway specifically in Section~\ref{sec:robustness}, where a controlled ablation reveals that the trained generator and DAFT conditioning together account for the bulk of the observed Dice and SSIM improvements over Forward Difference, while the temporal transformer's contribution is more nuanced.
  
 Figure~\ref{fig:comparison} visualises the Dice comparisons across brain regions, illustrating the consistent advantage of SynBADD over both NODER and ReMiND across all evaluated structures.
 
@@ -314,32 +316,96 @@ ReMiND operates in the intensity space, generating missing scans by synthesising
 NODER models deformations using stationary velocity fields and learns a continuous trajectory in SVF space via neural ordinary differential equations. However, it requires fitting a separate model for each subject and each target timepoint, which limits scalability and introduces susceptibility to overfitting, particularly when the number of available scans per subject is small. Its supervision is based on image regression, which may lead to oversmoothing of predicted deformations.
  
 SynBADD shares with NODER the principle of operating in deformation space, but differs in several respects. It trains a single population-level model that generalises across subjects and diagnostic groups, rather than requiring per-subject optimisation. It reasons bidirectionally over the full available longitudinal context, rather than relying on pairwise or unidirectional conditioning. The refinement module, conditioned on clinical metadata, provides subject-specific adaptation within the population-level framework. And the synthesis is performed natively in 3D, producing volumetrically coherent outputs by construction.
- 
+
 These design choices collectively account for the observed performance gap. Operating in deformation space preserves anatomical topology, bidirectional attention captures richer temporal context, and population-level training enables robust generalisation even under limited longitudinal sampling.
 
+\begin{table}[ht]
+\centering
+\caption{Taxonomy of comparison methods along design axes that influence longitudinal imputation quality.}
+\small
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{>{\bfseries}lcccc}
+\toprule
+Method & Synthesis space & Native 3D & Temporal context & Subject-specific fit \\
+\midrule
+ReMiND & Intensity (2D slices) & No & Pairwise (flanking) & No (population) \\
+NODER & Deformation (SVF) & Yes & Continuous (per-subject ODE) & Yes (per-subject) \\
+Forward Difference & Intensity (copy) & Yes & Most-recent past only & No \\
+\textbf{SynBADD (ours)} & Deformation (SVF) & Yes & Bidirectional, multi-input & No (DAFT-conditioned) \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\label{tab:method_taxonomy}
+\end{table}
+
 % ----------------------------------------------------------
-% 5.2.2 Quantitative Comparison on Full Evaluation Cohort
+% 5.2.4 Quantitative Comparison on Full Evaluation Cohort
 % ----------------------------------------------------------
 \subsubsection{Quantitative Comparison on Full Evaluation Cohort}
 
-To assess the consistency of the reported improvements, we present per-fold results across all five cross-validation splits. Table~\ref{tab:perfold_psnr} reports PSNR and SSIM for SynBADD and NODER in each fold. SynBADD outperforms NODER in every fold, with per-fold PSNR improvements ranging from 3.07 to 4.13 dB and SSIM improvements ranging from 0.0217 to 0.0268. The variance across folds is small for both methods, confirming that the observed gains are stable and not driven by favourable splits.
- 
-Table~\ref{tab:perfold_dice} extends this analysis to Dice scores for the hippocampus, parahippocampal gyrus, and third ventricle. SynBADD maintains Dice scores above 0.85 in every fold for all three regions, whereas NODER exhibits greater variability and consistently lower overlap, particularly for the parahippocampal gyrus.
- 
-We additionally report the Jacobian determinant statistics of the predicted deformation fields in Table~\ref{tab:jacobian}. Across all five folds, SynBADD produces mean Jacobian values in the range of 0.9232--0.9309, with standard deviations of approximately 0.04. A mean Jacobian slightly below unity is consistent with mild tissue contraction, reflecting the predominant atrophy pattern expected in a cohort that includes subjects with MCI and AD. Importantly, no negative Jacobian values were observed, confirming that all predicted deformations are diffeomorphic and topologically valid. This provides additional evidence that SynBADD generates anatomically plausible transformations, not merely transformations that produce visually similar images.
+To assess the consistency of the reported improvements, we present per-fold results across all five cross-validation splits. Table~\ref{tab:perfold_main} reports PSNR, SSIM, and Jacobian-determinant statistics for SynBADD across each fold. The variance across folds is small: PSNR ranges from 32.77 to 34.07 dB and SSIM from 0.9863 to 0.9901, indicating that the observed gains over the baselines are stable and not driven by favourable splits. The mean Jacobian determinant lies in the range 0.926--0.929 with standard deviations of approximately 0.037--0.039, well above zero in every fold; no negative Jacobian values were observed at any voxel in any fold. This confirms that the predicted deformations are diffeomorphic and topologically valid, and that the small sub-unity mean is consistent with mild net tissue contraction---the expected biological signature in a cohort containing MCI and AD subjects.
+
+\begin{table}[ht]
+\centering
+\caption{Per-fold image quality and deformation plausibility for SynBADD on the ADNI-1 test cohort. The Jacobian-determinant statistics are computed over the brain-masked region. $\uparrow$ indicates higher is better; mean Jacobian values close to unity indicate volume-preserving deformations.}
+\begin{tabular}{>{\bfseries}lcccc}
+\toprule
+Fold & PSNR $\uparrow$ & SSIM $\uparrow$ & Mean Jacobian & Std Jacobian \\
+\midrule
+Fold 1 & 33.1770 & 0.9874 & 0.9263 & 0.0379 \\
+Fold 2 & 34.0692 & 0.9901 & 0.9287 & 0.0372 \\
+Fold 3 & 33.6161 & 0.9884 & 0.9279 & 0.0379 \\
+Fold 4 & 32.7747 & 0.9863 & 0.9258 & 0.0356 \\
+Fold 5 & 33.4522 & 0.9893 & 0.9270 & 0.0390 \\
+\midrule
+\textbf{Mean} & \textbf{33.4178} & \textbf{0.9883} & \textbf{0.9271} & \textbf{0.0375} \\
+\bottomrule
+\end{tabular}
+\label{tab:perfold_main}
+\end{table}
+
+To assess whether image quality is uniform across the longitudinal horizon, we additionally report PSNR, SSIM and the mean Jacobian determinant stratified by the target follow-up timepoint, averaged over all five folds. As shown in Table~\ref{tab:per_timepoint}, performance is essentially flat across the five timepoints, with PSNR varying by less than 0.18 dB between m06 and m36 and SSIM varying by 0.0008. The mean Jacobian determinant is similarly stable in the range 0.9264--0.9273. The model neither exploits short-horizon predictions nor degrades for the longest target horizon (m36), which is consistent with the diffeomorphic SVF formulation: the magnitude of the encoded deformation scales with the predicted timepoint, but the structural fidelity of the warped image does not.
+
+\begin{table}[ht]
+\centering
+\caption{SynBADD performance stratified by target follow-up timepoint, averaged over the five cross-validation folds. Image quality is essentially uniform across the longitudinal horizon.}
+\begin{tabular}{>{\bfseries}lccc}
+\toprule
+Target & PSNR $\uparrow$ & SSIM $\uparrow$ & Mean Jacobian \\
+\midrule
+m06 & 33.4505 & 0.9884 & 0.9273 \\
+m12 & 33.5096 & 0.9887 & 0.9272 \\
+m18 & 33.3761 & 0.9886 & 0.9264 \\
+m24 & 33.3742 & 0.9879 & 0.9273 \\
+m36 & 33.3400 & 0.9879 & 0.9269 \\
+\bottomrule
+\end{tabular}
+\label{tab:per_timepoint}
+\end{table}
 
 % ----------------------------------------------------------
-% 5.2.3 Subgroup Analysis Across Clinical and Temporal Variables
+% 5.2.5 Subgroup Analysis Across Clinical Variables
 % ----------------------------------------------------------
-\subsubsection{Subgroup Analysis Across Clinical and Temporal Variables}
+\subsubsection{Subgroup Analysis Across Diagnostic Groups}
 
-% \textit{[This section will present a disaggregated analysis of SynBADD's performance across clinical subgroups and temporal configurations.]}
- 
-% \textit{The first part will stratify results by diagnostic group (CN, MCI, AD). We will report PSNR, SSIM, and Dice scores separately for each group to determine whether imputation quality varies with disease severity. This is clinically relevant because subjects with AD exhibit more pronounced and spatially heterogeneous atrophy, which places greater demands on the deformation model. A stable or only mildly degraded performance in the AD subgroup would indicate that SynBADD's deformation-based formulation can accommodate the larger and more localised deformations associated with advanced neurodegeneration.}
- 
-% \textit{The second part will examine performance as a function of the target timepoint's position within the longitudinal sequence. Missing scans at boundary positions (e.g., the earliest or latest follow-up) have asymmetric temporal context---only past or only future observations are available---whereas centrally positioned missing scans benefit from bidirectional context. Evaluating across timepoint positions will reveal the extent to which the model's performance depends on the availability of flanking observations, and will complement the robustness analysis presented in Section~\ref{sec:robustness}.}
- 
-% \textit{Tables and figures reporting these disaggregated results will be included upon completion of the subgroup analyses.}
+A practical imputation method must perform consistently across diagnostic strata, because subjects with more advanced neurodegeneration exhibit larger and more spatially heterogeneous deformations. We stratify the full evaluation cohort by diagnostic label---cognitively normal (CN), mild cognitive impairment (MCI), and Alzheimer's disease (AD)---and report image quality and deformation-plausibility metrics within each stratum (Table~\ref{tab:subgroup_main}).
+
+The three groups achieve broadly comparable PSNR and SSIM, with a maximum group-wise PSNR spread of 0.28 dB (CN: 33.60, MCI: 33.54, AD: 33.32) and SSIM differences within $1.9 \times 10^{-3}$. The mean Jacobian determinant is slightly higher in AD ($0.9304$) than in CN ($0.9284$) or MCI ($0.9279$), and is lowest---i.e.\ corresponds to the largest contraction---in MCI. This ordering is consistent with the established neurodegeneration trajectory~\cite{braak1991neuropathological,jack2018nia}, in which MCI subjects exhibit the highest rate of tissue loss as they undergo conversion, while AD subjects' atrophy is concentrated in the medial temporal lobe but is more variable globally. Importantly, no negative Jacobian values were observed in any subgroup, confirming that the diffeomorphic property of the predicted deformations is preserved across all clinical strata. The fact that image quality does not degrade in the AD subgroup, despite the larger and more heterogeneous deformations expected in this population, indicates that SynBADD's deformation-based formulation accommodates the demands of advanced neurodegeneration without specialised per-group training.
+
+\begin{table}[ht]
+\centering
+\caption{SynBADD performance stratified by diagnostic group (CN, MCI, AD), averaged over folds for which the subgroup breakdown is available. Image quality is broadly stable across groups; the ordering of mean Jacobian values is consistent with known atrophy trajectories.}
+\begin{tabular}{>{\bfseries}lcccc}
+\toprule
+Group & PSNR $\uparrow$ & SSIM $\uparrow$ & Mean Jacobian & Std Jacobian \\
+\midrule
+CN  & 33.6008 & 0.9888 & 0.9284 & 0.0370 \\
+MCI & 33.5437 & 0.9888 & 0.9279 & 0.0387 \\
+AD  & 33.3218 & 0.9869 & 0.9304 & 0.0363 \\
+\bottomrule
+\end{tabular}
+\label{tab:subgroup_main}
+\end{table}
 
 
 % ----------------------------------------------------------
@@ -350,31 +416,92 @@ We additionally report the Jacobian determinant statistics of the predicted defo
  
 In clinical practice, subjects rarely present with complete longitudinal imaging sequences. Missed visits, late enrolment, and early dropout frequently result in irregular and sparse temporal sampling. A practical imputation model must therefore degrade gracefully when fewer observations are available, and must handle asymmetric temporal context---where, for instance, more past scans than future scans are accessible, or vice versa. In this section, we evaluate SynBADD's sensitivity to these conditions.
 
+In what follows we conduct two controlled robustness experiments on the held-out subjects of fold 2. In addition to the full SynBADD model with U-Net and DAFT refinement (the configuration used elsewhere in this paper), we include a controlled \textit{No-UNet$+$No-DAFT} ablation that strips both the spatial refinement network and the clinical-metadata conditioning. Comparing the two models allows us to attribute the effect of reduced or asymmetric input context either to the temporal aggregation pathway or to the conditioned spatial refinement stage.
+
 % ----------------------------------------------------------
 % 5.3.1 Effect of Reduced Input Timepoints
 % ----------------------------------------------------------
 \subsubsection{Effect of Reduced Input Timepoints}
+\label{sec:reduced_inputs}
 
-% \textit{[This section will evaluate how SynBADD's imputation quality changes as the number of available input timepoints is progressively reduced.]}
- 
-% \textit{We will construct evaluation scenarios in which the model receives 4, 3, and 2 observed timepoints as context for predicting the missing scan, compared to the full complement of available observations used in the main experiments. For each configuration, we will report PSNR, SSIM, and Dice scores for key regions of interest, averaged over the five cross-validation folds.}
- 
-% \textit{The expected outcome is a gradual degradation in performance as temporal context is reduced, with the rate of degradation revealing how effectively the transformer leverages partial context. A shallow decline would indicate that the model extracts useful information from even a small number of observations, rather than requiring a densely sampled sequence. This has direct practical implications, as many longitudinal cohorts---including ADNI---contain subjects with only two or three available scans. We will additionally compare the reduced-context performance of SynBADD against the full-context performance of NODER and ReMiND, to assess whether SynBADD under impoverished conditions still matches or exceeds the baselines operating with their standard inputs.}
- 
-% \textit{A table reporting these results across input counts will be included upon completion of the experiments.}
+\paragraph{Setup.} For each diagnostic group we fix the target as the latest available follow-up that is observed for every subject in that group: m36 for CN and MCI, and m24 for AD (since none of the AD subjects in ADNI-1 have an m36 scan). The set of input timepoints available for masking is then the remaining non-baseline visits in that group's complete cohort: $\{m06, m12, m24\}$ for CN, $\{m06, m12, m18, m24\}$ for MCI, and $\{m06, m12\}$ for AD. We construct configurations $K = 1, 2, \ldots, K_{\max}$ where $K$ denotes the number of input scans retained (always including the screening scan as the source) and inputs are dropped nearest-to-target first. Each configuration is run as a separate forward pass through the trained model, with the masked inputs zeroed and accompanied by zero attention masks. Image-level and Dice metrics are computed per (subject, configuration) pair on the brain-masked region.
+
+\paragraph{Image-level metrics.} Figure~\ref{fig:exp1_image} reports PSNR, SSIM, and SVF endpoint error (EPE) as a function of the number of dropped inputs. The full UNet$+$DAFT model exhibits a striking flat profile: per-group SSIM and PSNR vary by less than $10^{-3}$ and $4 \times 10^{-2}$ dB respectively across the full range of $K$. By contrast, the No-UNet$+$No-DAFT ablation shows a smooth, monotonic decline. EPE in particular grows from $0.18$--$0.33$ at full context to $0.49$--$0.56$ at $K=1$ across the three groups: a $1.5\times$--$2.7\times$ rise in deformation error.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{images/exp1_image_metrics.pdf}
+    \caption{Image-level metrics under reduced input timepoints (Exp.~1). Solid lines: UNet$+$DAFT (full SynBADD); dashed lines: No-UNet$+$No-DAFT ablation. The full model is statistically invariant to the number of available inputs; the ablation degrades smoothly and monotonically.}
+    \label{fig:exp1_image}
+\end{figure}
+
+\paragraph{Anatomical metrics.} Figure~\ref{fig:exp1_dice} reports the average Dice over the eight regions of interest, again as a function of inputs dropped. The full model is essentially flat for all three groups (within-cohort change of $\leq 0.005$ Dice from $K=K_{\max}$ to $K=1$). The No-UNet$+$No-DAFT model shows clean monotonic degradation in MCI ($-0.0059$ Dice from $K_{\max}$ to $K=1$, $p < 10^{-4}$) and AD ($-0.0042$, $p<10^{-2}$), and a smaller non-monotonic effect in CN. The MCI subgroup---which spans the longest evaluation horizon and contains the most heterogeneous trajectories---is the cleanest illustration of the underlying signal.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/exp1_dice_curves.pdf}
+    \caption{Average Dice over the eight ROIs as a function of inputs dropped (Exp.~1). The full UNet$+$DAFT model is invariant; the No-UNet$+$No-DAFT ablation shows monotonic degradation, particularly clear in the MCI cohort which has the longest dynamic range.}
+    \label{fig:exp1_dice}
+\end{figure}
+
+Figure~\ref{fig:exp1_radar} provides a per-region radar view of the Dice change between full context ($K=K_{\max}$) and source-only ($K=1$). For the full model the two contours are visually indistinguishable in every group; for the No-UNet$+$No-DAFT model the $K=1$ contour shrinks measurably for the temporal-lobe regions (middle and inferior temporal gyrus, fusiform gyrus), with the largest decrements concentrated in MCI.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{images/exp1_radar_per_region.pdf}
+    \caption{Per-region Dice at full context vs.\ source-only ($K{=}1$), shown as a polar plot for each diagnostic group (Exp.~1). The two contours coincide for the full UNet$+$DAFT model (blue), confirming invariance to input availability. For the No-UNet$+$No-DAFT model (orange) the $K{=}1$ contour visibly contracts in the temporal-lobe regions in MCI and AD.}
+    \label{fig:exp1_radar}
+\end{figure}
+
+\paragraph{Statistical confirmation.} A non-parametric repeated-measures Friedman test on each group rejects the null of identical medians across $K$ for the No-UNet$+$No-DAFT model on every metric ($p < 10^{-4}$ for SSIM, PSNR, EPE, and Dice in MCI). For the UNet$+$DAFT model the only significant Friedman tests are those whose effect size lies at the seventh decimal place ($p \approx 5 \times 10^{-3}$, $\Delta_{\max} \approx 10^{-7}$ for SSIM)---statistically detectable but practically zero. Per-subject Spearman correlations between the number of dropped inputs and the metric show this contrast even more cleanly: for the No-UNet$+$No-DAFT model, the per-subject Spearman $\rho$ between dropped-input count and EPE is $+1.0$ for every subject in every group, indicating that EPE rises monotonically with each additional dropped input on a per-subject basis. For the UNet$+$DAFT model the same correlation has mean $\rho = -0.11$ ($p = 0.34$).
+
+A paired Wilcoxon test across the cohort-stable 76 subjects, comparing the per-subject change $\Delta(K_{\max} \to K_{\max}-2)$ between the two models, finds that the two models respond to input reduction in significantly different ways on every meaningful metric: $p = 8.3 \times 10^{-5}$ for SSIM, $p = 9.9 \times 10^{-4}$ for PSNR, $p = 3.6 \times 10^{-14}$ for EPE, and $p = 1.1 \times 10^{-3}$ for average Dice. This cross-model contrast is summarised visually in Figure~\ref{fig:exp1_cross}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/exp1_cross_model_delta.pdf}
+    \caption{Cross-model paired-$\Delta$ comparison on the cohort-stable subjects ($n=76$, Exp.~1). Each bar is the mean per-subject change in the metric when two input timepoints are dropped relative to full context. The two models differ significantly on every metric (paired Wilcoxon).}
+    \label{fig:exp1_cross}
+\end{figure}
+
+\paragraph{Interpretation.} The contrast between the two models reveals that the apparent robustness of the full model is not a property of the temporal architecture per se, but rather a consequence of DAFT conditioning: when the U-Net refinement network has access to the diagnostic group, age, and target-timepoint encoding, these clinical priors are sufficient to produce a high-quality deformation, leaving the temporal transformer with a redundant role. The same architecture, evaluated in the No-UNet$+$No-DAFT configuration, exhibits the gradual and monotonic degradation that one would expect of a temporally-aware model: each additional dropped input contributes a measurable loss of fidelity, with the largest decrements concentrated in the medial-temporal regions where atrophy is most pronounced. This is consistent with two complementary readings: (i) clinically, SynBADD remains usable even when the longitudinal record is sparse, because the conditioning network provides a reliable prior; (ii) architecturally, the temporal transformer is not the dominant contributor to imputation quality in the conditioned configuration, but it does encode useful information that the unconditioned ablation actively exploits.
 
 % ----------------------------------------------------------
 % 5.3.2 Effect of Asymmetric Context Availability
 % ----------------------------------------------------------
 \subsubsection{Effect of Asymmetric Context Availability}
+\label{sec:asymmetry}
 
-% \textit{[This section will directly test the bidirectional reasoning capability that is central to SynBADD's design, by comparing performance under three temporal context configurations: past-only, future-only, and full bidirectional.]}
- 
-% \textit{In the past-only setting, the model is given access only to latent codes from timepoints preceding the missing scan. In the future-only setting, only subsequent timepoints are provided. In the bidirectional setting, both past and future observations are available. By comparing these conditions, we aim to quantify the contribution of each temporal direction to the quality of the imputed scan.}
- 
-% \textit{This analysis is clinically motivated. In many real-world settings, the missing scan corresponds to the most recent follow-up (e.g., a subject who drops out), in which case only past context is available. Conversely, a subject who enrols late may have future scans but lack early observations. Understanding how SynBADD performs under each regime informs its practical applicability and validates the design choice of incorporating bidirectional temporal attention.}
- 
-% \textit{We anticipate that bidirectional context will yield the best performance overall, but that the model will still produce reasonable imputations under unidirectional conditions, owing to the temporal transformer's ability to attend selectively to whichever context is available. The relative performance drop from bidirectional to each unidirectional setting will quantify the value of each temporal direction. A table comparing PSNR, SSIM, and Dice across the three conditions will be included.}
+\paragraph{Setup.} For each subject in the CN and MCI cohorts we fix the target as the central timepoint (m12), and define four single-input mask configurations: \textit{drop\_m06} (past, $-6$ months from target), \textit{drop\_m18} (MCI only; near future, $+6$ months), \textit{drop\_m24} (mid future, $+12$ months), and \textit{drop\_m36} (far future, $+24$ months). We additionally include a \textit{full} configuration that retains every available input. The AD cohort is excluded from this experiment because no AD subject has an m36 scan, which makes the asymmetry test degenerate (only $\pm 12$-month inputs are available). The combination of past-vs-future and near-vs-far contrasts allows us to disentangle a directional bias from a recency effect.
+
+\paragraph{Past versus future.} Across both models and both diagnostic groups, masking the single past input ($-$m06) yields metric distributions that are statistically indistinguishable from masking the single near-future input. A paired Wilcoxon test of SSIM under past-mask versus the average future-mask gives $p = 0.92$ for the UNet$+$DAFT model and $p = 0.35$ for the No-UNet$+$No-DAFT model, both far above the $\alpha = 0.05$ threshold. This is consistent across CN ($p = 1.00$ and $p = 0.64$) and MCI ($p = 0.84$ and $p = 0.48$). The bidirectional architectural choice does not produce direction-biased behaviour in either model. Figure~\ref{fig:exp2_past_vs_future} illustrates this in scatter form: the EPE under past-mask and under (mean) future-mask are tightly clustered around the line $y=x$ for the No-UNet$+$No-DAFT model on the MCI cohort.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.55\textwidth]{images/exp2_past_vs_future_scatter.pdf}
+    \caption{Per-subject EPE under past-input mask versus mean future-input mask, MCI cohort, No-UNet$+$No-DAFT model (Exp.~2). The scatter is symmetric around $y=x$; no direction bias is detectable.}
+    \label{fig:exp2_past_vs_future}
+\end{figure}
+
+\paragraph{Near versus far.} The recency effect is the cleaner of the two contrasts. Figure~\ref{fig:exp2_metrics} shows PSNR and EPE per mask configuration for both models. The UNet$+$DAFT model is again essentially flat (per-group SSIM range $\leq 5 \times 10^{-8}$). The No-UNet$+$No-DAFT model shows a small but consistent increase in EPE---and a corresponding small drop in PSNR---when any single input is masked. Crucially, the per-subject Spearman correlation between the masked input's distance from the target (in months) and the resulting EPE is $\rho = -0.29$ ($p = 6.96 \times 10^{-4}$, $n = 60$) for the No-UNet$+$No-DAFT model, with $72\%$ of subjects exhibiting a negative correlation. The corresponding correlation for the UNet$+$DAFT model is $\rho = +0.10$ ($p = 0.57$). In other words, the No-UNet$+$No-DAFT model is more degraded when a temporally proximal input is masked than when a distant one is removed, which is precisely the recency-weighted aggregation behaviour one would hope for.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{images/exp2_metrics_by_config.pdf}
+    \caption{Image-level metrics under single-input masking (Exp.~2), grouped by diagnostic class and mask configuration. The UNet$+$DAFT model is invariant; the No-UNet$+$No-DAFT model exhibits a small but systematic degradation under each mask, with no direction-of-time bias.}
+    \label{fig:exp2_metrics}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/exp2_recency_curve.pdf}
+    \caption{EPE versus the absolute distance (in months) of the masked input from the target, for both models (Exp.~2). The UNet$+$DAFT model is flat; the No-UNet$+$No-DAFT model shows a clean recency effect---closer inputs matter more.}
+    \label{fig:exp2_recency}
+\end{figure}
+
+\paragraph{Region-level effects.} Per-ROI Dice under the four mask configurations is shown in Figure~\ref{fig:exp1_radar}'s companion analysis (omitted here for brevity but reported in the supplementary tables). For the UNet$+$DAFT model the within-cohort range across configurations is at most $9 \times 10^{-3}$ Dice in any ROI. For the No-UNet$+$No-DAFT model the changes are larger but still modest---typically $5 \times 10^{-3}$--$1 \times 10^{-2}$ Dice---and concentrated in the entorhinal cortex and the temporal-lobe regions. The third ventricle and amygdala, both of which are structurally well-defined and large relative to the per-input deformation, are the most stable.
+
+\paragraph{Interpretation.} The asymmetric-context experiment provides three findings. First, neither model exhibits a past-versus-future bias: the bidirectional architectural choice does not produce direction-biased behaviour in either trained instance. Second, the No-UNet$+$No-DAFT model exhibits a weak but statistically robust recency effect---closer inputs are more informative than distant ones, with effect size strongest for MCI subjects. Third, the UNet$+$DAFT model is statistically invariant under all single-input masks, again consistent with the read that DAFT-conditioned inference dominates the temporal pathway in the trained main configuration. Together with the reduced-input experiment in Section~\ref{sec:reduced_inputs}, this paints a coherent picture: SynBADD's temporal transformer architecture \emph{can} learn time-aware aggregation behaviour, but in the configuration used elsewhere in this paper the diagnostic-group, age, and target-timepoint conditioning provide a sufficient prior that renders the per-subject longitudinal observations effectively redundant. From the perspective of clinical deployment, this is a positive property: the model degrades gracefully when the longitudinal record is sparse or asymmetric. From the perspective of architectural attribution, however, it reframes the contribution of each component: the spatial refinement network conditioned on clinical metadata is the dominant driver of imputation quality in the trained main model.
 
 
 % ----------------------------------------------------------

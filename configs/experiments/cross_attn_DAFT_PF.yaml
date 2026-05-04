@@ -1,0 +1,27 @@
+# Main model: CrossAttentionTransformer + UNet+DAFT, Past+Future
+# Used for robustness experiments on fold 2 (and any other fold once trained).
+_base_: ../base.yaml
+
+model:
+  temporal:
+    type: CrossAttentionTransformer
+    use_positional_embeddings: true
+  generator:
+    using_daft: true
+    using_unet: true
+  discriminator:
+    enabled: false
+
+data:
+  fold: 2
+  use_past_data: true
+  use_future_data: true
+  target_timepoint: all
+  svf_type: baseline
+
+# Pretrained weights live under this project directory.
+project_name: SYNBADD_ADNI_5FoldCrossVal_NewVAEModel_ALL_NewDatasetAndSVFS_TransformerAblations
+
+wandb:
+  enabled: true
+  project: SYNBADD_Experiments

@@ -1,0 +1,28 @@
+# NoUnet + NoDAFT ablation model: CrossAttentionTransformer with the spatial
+# refinement and clinical conditioning paths disabled. Used for robustness
+# experiments to test whether DAFT is the component carrying the signal.
+_base_: ../base.yaml
+
+model:
+  temporal:
+    type: CrossAttentionTransformer
+    use_positional_embeddings: true
+  generator:
+    using_daft: false
+    using_unet: false
+  discriminator:
+    enabled: false
+
+data:
+  fold: 2
+  use_past_data: true
+  use_future_data: true
+  target_timepoint: all
+  svf_type: baseline
+
+# Pretrained NoUnet+NoDAFT checkpoints live under this project directory.
+project_name: SYNBADD_ADNI_5FoldCrossVal_NewVAEModel_ALL_NewDatasetAndSVFS_UnetAblations
+
+wandb:
+  enabled: true
+  project: SYNBADD_Experiments

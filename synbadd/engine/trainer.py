@@ -106,6 +106,13 @@ class Trainer:
         if self.discriminator is not None:
             self.discriminator = self.discriminator.to(self.device)
 
+        # Keep VAE frozen end-to-end: avoids BN running stats drifting during training
+        self.vae_model.eval()
+
+    def _get_vae_module(self):
+        """Return the underlying VAE (unwrap DataParallel if needed)."""
+        return self.vae_model.module if hasattr(self.vae_model, "module") else self.vae_model
+
     def _load_frozen_vae(self):
         """Load pretrained VAE and freeze all parameters."""
         vae = build_model("VAE3D_UNetSkip")
@@ -180,16 +187,35 @@ class Trainer:
     def _forward(self, batch):
         """Run forward pass on a batch, returning generated image and field."""
         device = self.device
+        cfg = self.cfg
         stacked_svf = batch["stacked_svf"].to(device).float()
         latest_scan = batch["latest_scan"].to(device).float()
         class_labels = batch["class_label"].to(device).float()
         reg_labels = batch["reg_label"].to(device).float()
         target_timepoint = batch["target_timepoint"].to(device).float()
+        target_timepoint_index = batch["target_timepoint_index"].to(device)
 
         target_labels = torch.cat([class_labels, reg_labels, target_timepoint], dim=1)
 
-        # Averaged SVF imputation (current active path)
-        contextualized_scan = stacked_svf.mean(dim=1)
+        # VAE encode -> temporal model -> VAE decode
+        if cfg.data.use_past_data or cfg.data.use_future_data:
+            batch_size, temporal_dim, c_dim, h, w, d = stacked_svf.shape
+            stacked_flat = stacked_svf.view(-1, c_dim, h, w, d)
+
+            vae = self._get_vae_module()
+            mu, _, skips = vae.encode(stacked_flat)
+            mu = mu.detach()
+            skips = [s.detach() for s in skips]
+
+            for si in range(len(skips)):
+                s_shape = skips[si].shape
+                skips[si] = skips[si].view(batch_size, temporal_dim, *s_shape[1:]).mean(dim=1)
+
+            latent = mu.view(batch_size, temporal_dim, -1)
+            contextualized = self.temporal_model(latent, target_timepoint_index)
+            contextualized_scan = vae.decode(contextualized, skips)
+        else:
+            contextualized_scan = latest_scan
 
         y_synthetic, synthetic_field = self.generator(
             latest_scan, contextualized_scan, target_labels

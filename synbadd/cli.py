@@ -153,6 +153,75 @@ def pipeline(config_path, fold, overrides, folds, stages, skip_existing, compari
 
 
 # ---------------------------------------------------------------------------
+# experiment
+# ---------------------------------------------------------------------------
+
+@main.group()
+def experiment():
+    """Run robustness experiments on a pre-trained model."""
+    pass
+
+
+@experiment.command("list")
+def experiment_list():
+    """List all registered experiments."""
+    import synbadd.experiments  # noqa: F401  (triggers registry)
+    from synbadd.experiments.registry import list_experiments
+    for name in list_experiments():
+        click.echo(name)
+
+
+@experiment.command("run")
+@config_options
+@click.option("--experiment-name", "-e", required=True,
+              help="Registered experiment name (see `synbadd experiment list`)")
+@click.option("--run-name", required=True,
+              help="Pre-trained run name (filename stem of the checkpoint)")
+@click.option("--skip-inference", is_flag=True,
+              help="Skip the inference phase; aggregate from existing per_config_metrics.csv")
+@click.option("--skip-existing", is_flag=True,
+              help="Skip individual configs whose .nii.gz already exists")
+@click.option("--recover-metrics", is_flag=True,
+              help="Skip inference; recompute metrics from saved .nii.gz files (no model)")
+@click.option("--with-dice", is_flag=True,
+              help="Compute Dice + volume per ROI from saved .nii.gz (uses ANTs SyN; slow)")
+@click.option("--cleanup", is_flag=True,
+              help="Delete .nii.gz files after aggregation; keeps CSVs")
+def experiment_run(config_path, fold, overrides, experiment_name, run_name,
+                   skip_inference, skip_existing, recover_metrics, with_dice, cleanup):
+    """Run a robustness experiment on a pre-trained model."""
+    cfg = load_config(config_path, list(overrides), fold)
+    cfg = _with_run_name(cfg, run_name)
+
+    import synbadd.experiments  # noqa: F401
+    from synbadd.data.loader import _DATASET_CLASSES
+    from synbadd.experiments.registry import build_experiment
+    from synbadd.experiments.runner import ExperimentRunner
+
+    dataset_cls = _DATASET_CLASSES.get(cfg.data.svf_type)
+    if dataset_cls is None:
+        raise click.ClickException(
+            f"Unknown svf_type '{cfg.data.svf_type}'. "
+            f"Available: {list(_DATASET_CLASSES)}"
+        )
+    dataset = dataset_cls(cfg, cfg.paths.csv_file, cfg.data.fold, subset="test")
+
+    exp = build_experiment(experiment_name, cfg, cfg.data.fold)
+    runner = ExperimentRunner(cfg, exp, dataset)
+    runner.run(
+        skip_inference=skip_inference,
+        skip_existing=skip_existing,
+        recover_metrics=recover_metrics,
+        with_dice=with_dice,
+        cleanup=cleanup,
+    )
+    click.echo(
+        f"Experiment '{experiment_name}' complete (fold {cfg.data.fold}). "
+        f"Outputs: {runner.output_dir}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # manifest
 # ---------------------------------------------------------------------------
 
