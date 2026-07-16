@@ -2,17 +2,17 @@
 
 \subsection{Dataset}
 
-We conduct our experiments on the ADNI-1 longitudinal cohort~\cite{}, which comprises T1-weighted 3D brain MRI scans acquired using 1.5T scanners at six scheduled timepoints: baseline (screening), 6 months, 12 months, 18 months, 24 months, and 36 months. The dataset includes 382 participants, of whom 148 were diagnosed with Mild Cognitive Impairment (MCI), 99 with Alzheimer’s Disease (AD), and the remainder classified as cognitively normal (CN). For evaluation, we employ five-fold cross-validation with subject-level stratified splitting. This ensures that all scans from a given subject appear exclusively in a single fold, preventing data leakage across training and validation sets.
+We conduct our experiments on the ADNI-1 longitudinal cohort~\cite{jack2008adni}, which comprises T1-weighted 3D brain MRI scans acquired using 1.5T scanners at six scheduled timepoints: baseline (screening), 6 months, 12 months, 18 months, 24 months, and 36 months. The dataset includes 382 participants, of whom 148 were diagnosed with Mild Cognitive Impairment (MCI), 99 with Alzheimer’s Disease (AD), and the remainder classified as cognitively normal (CN). For evaluation, we employ five-fold cross-validation with subject-level stratified splitting. This ensures that all scans from a given subject appear exclusively in a single fold, preventing data leakage across training and validation sets.
 
-% We use the ADNI-1 longitudinal cohort~\cite{}, which provides T1-weighted 3D brain MRI scans acquired on 1.5T scanners across six discrete timepoints: baseline (screening), 6 months, 12 months, 18 months, 24 months, and 36 months. The subset includes 382 participants, stratified at the subject level into diagnostic groups: 148 with Mild Cognitive Impairment (MCI), 99 with Alzheimer's disease (AD) and the rest with normal cognitive functioning (CN). To prevent data leakage, each subject appears in exactly one split, training, validation, or test, ensuring that temporal scans from the same individual are not shared across subsets.
+% We use the ADNI-1 longitudinal cohort~\cite{jack2008adni}, which provides T1-weighted 3D brain MRI scans acquired on 1.5T scanners across six discrete timepoints: baseline (screening), 6 months, 12 months, 18 months, 24 months, and 36 months. The subset includes 382 participants, stratified at the subject level into diagnostic groups: 148 with Mild Cognitive Impairment (MCI), 99 with Alzheimer's disease (AD) and the rest with normal cognitive functioning (CN). To prevent data leakage, each subject appears in exactly one split, training, validation, or test, ensuring that temporal scans from the same individual are not shared across subsets.
 
 \subsection{Preprocessing}
 
-All scans were preprocessed using FreeSurfer v8.0.0~\cite{}. We applied standard corrections including B1 bias field correction and N3 non-uniformity correction, followed by intensity normalization using \texttt{mri\_convert}. When scan metadata did not include scaling information, a default scale factor of 1.0 was used. For scans lacking prior skull stripping, brain extraction was performed using \texttt{mri\_watershed}. To account for inter-scan variability while preserving anatomical structure, each follow-up scan is coregistered to its respective baseline scan using rigid-body affine transformation via ANTs. Following registration, all scans were zero-padded to a cubic volume of $(256, 256, 256)$ voxels, then downsampled to $(128, 128, 128)$ to reduce computational overhead while preserving anatomical structure. To represent anatomical change over time, we compute stationary velocity fields (SVFs) between each follow-up scan and the baseline using VoxelMorph~\cite{}. These SVFs were then used to warp the follow-up scans onto the baseline space. The warped follow-up scans, aligned to the baseline anatomy, serves as the training targets for our deformation-based generative framework. 
+All scans were preprocessed using FreeSurfer v8.0.0~\cite{fischl2012freesurfer}. We applied standard corrections including B1 bias field correction and N3 non-uniformity correction, followed by intensity normalization using \texttt{mri\_convert}. When scan metadata did not include scaling information, a default scale factor of 1.0 was used. For scans lacking prior skull stripping, brain extraction was performed using \texttt{mri\_watershed}. To account for inter-scan variability while preserving anatomical structure, each follow-up scan is coregistered to its respective baseline scan using rigid-body affine transformation via ANTs~\cite{avants2008ants}. Following registration, all scans were zero-padded to a cubic volume of $(256, 256, 256)$ voxels, then downsampled to $(128, 128, 128)$ to reduce computational overhead while preserving anatomical structure. To represent anatomical change over time, we compute stationary velocity fields (SVFs) between each follow-up scan and the baseline using VoxelMorph~\cite{balakrishnan2019voxelmorph,dalca2018unsupervised}. These SVFs were then used to warp the follow-up scans onto the baseline space. The warped follow-up scans, aligned to the baseline anatomy, serves as the training targets for our deformation-based generative framework.
 
 % To ensure spatial alignment across timepoints while preserving individual brain morphology, each follow-up scan was rigidly registered to the subject’s own baseline scan using ANTs. This rigid transformation, restricted to rotation and translation, avoids deformation or scaling that could alter anatomical proportions. All scans were zero-padded to a cubic volume of $(256, 256, 256)$ voxels, then downsampled to $(128, 128, 128)$ to reduce computational overhead while preserving anatomical structure.
 
-% Finally, to represent anatomical progression as deformation, we computed stationary velocity fields (SVFs) using VoxelMorph~\cite{}, registering each follow-up scan to the baseline. These SVFs form the core input for our generative models, enabling a structured representation of brain changes over time.
+% Finally, to represent anatomical progression as deformation, we computed stationary velocity fields (SVFs) using VoxelMorph~\cite{balakrishnan2019voxelmorph,dalca2018unsupervised}, registering each follow-up scan to the baseline. These SVFs form the core input for our generative models, enabling a structured representation of brain changes over time.
 
 
 
@@ -21,27 +21,27 @@ All scans were preprocessed using FreeSurfer v8.0.0~\cite{}. We applied standard
 % ----------------------------------------------------------
 \subsection{Implementation Details}
 \label{sec:implementation}
- 
+
 \subsubsection*{Network Architectures}
- 
-The VAE encoder and decoder follow a 3D U-Net architecture~[] with five convolutional layers and multi-resolution skip connections. Each convolutional block consists of $3 \times 3 \times 3$ convolutions followed by instance normalisation and leaky ReLU activations. The encoder produces a latent vector $z_i \in \mathbb{R}^d$ along with a hierarchy of skip features $s_i$ at each resolution level. The decoder mirrors the encoder and reconstructs the SVF from the latent code and skip features.
- 
-The temporal trajectory model is a transformer encoder~[] with two layers and eight attention heads, operating over a sequence of up to five latent codes corresponding to the longitudinal timepoints following the baseline. Each latent code is augmented with learnable positional embeddings encoding the relative temporal ordering and time directionality embeddings distinguishing past from future observations relative to the missing timepoint. A learnable linear projection maps the target timepoint index to a query embedding $q_{t_p} \in \mathbb{R}^d$ used for target-aware attention pooling.
- 
-The spatial refinement network is a 3D U-Net that takes the coarse decoded SVF as input and produces the refined deformation field. Clinical metadata---specifically subject age and diagnostic label---are injected at every layer of this network via dynamic affine feature-map transforms (DAFT)~[], which apply learned affine transformations to the intermediate feature maps conditioned on the metadata variables. The final warping is performed using a differentiable spatial transformer network (STN)~[] at the full spatial resolution of $128 \times 128 \times 128$.
- 
+
+The VAE encoder and decoder follow a 3D U-Net architecture~\cite{ronneberger2015unet} with five convolutional layers and multi-resolution skip connections. Each convolutional block consists of $3 \times 3 \times 3$ convolutions followed by instance normalisation and leaky ReLU activations. The encoder produces a latent vector $z_i \in \mathbb{R}^d$ along with a hierarchy of skip features $s_i$ at each resolution level. The decoder mirrors the encoder and reconstructs the SVF from the latent code and skip features.
+
+The temporal trajectory model is a transformer encoder~\cite{vaswani2017attention} with two layers and eight attention heads, operating over a sequence of up to five latent codes corresponding to the longitudinal timepoints following the baseline. Each latent code is augmented with learnable positional embeddings encoding the relative temporal ordering and time directionality embeddings distinguishing past from future observations relative to the missing timepoint. A learnable linear projection maps the target timepoint index to a query embedding $q_{t_p} \in \mathbb{R}^d$ used for target-aware attention pooling.
+
+The spatial refinement network is a 3D U-Net that takes the coarse decoded SVF as input and produces the refined deformation field. Clinical metadata---specifically subject age and diagnostic label---are injected at every layer of this network via dynamic affine feature-map transforms (DAFT)~\cite{wolf2022daft}, which apply learned affine transformations to the intermediate feature maps conditioned on the metadata variables. The final warping is performed using a differentiable spatial transformer network (STN)~\cite{jaderberg2015spatial} at the full spatial resolution of $128 \times 128 \times 128$.
+
 \subsubsection*{Synthetic Augmentation}
- 
+
 During VAE pretraining, we apply on-the-fly synthetic augmentations to expand the effective training set of SVFs. Augmented fields are generated through random combinations of three transformation types: random 3D rotations sampled from the SO(3) group using Euler angle parameterisation, smooth affine ramp fields that introduce spatially varying scaling and shearing, and elastic noise perturbations constrained to maintain smoothness. These augmentations are applied directly to the SVFs and are designed to preserve diffeomorphic properties, ensuring that the augmented fields remain physically plausible deformations. This strategy enriches the intra-subject deformation space and improves the model's capacity to generalise across unseen subjects and anatomical variations, which is particularly important given the limited number of real longitudinal scans per subject.
- 
+
 \subsubsection*{Training Procedure}
- 
+
 All models are trained using four NVIDIA RTX 6000 GPUs (48\,GB memory each). We employ five-fold cross-validation with subject-level stratified splitting, ensuring that all scans from a given subject appear in exactly one of the training, validation, or test partitions. Each fold contains approximately 275 subjects (1100 samples) for training, 30 subjects (120 samples) for validation, and 77 subjects (320 samples) for testing. Each subject contributes between three and five timepoints.
- 
-The optimiser is Adam with an initial learning rate of $5 \times 10^{-5}$. We use a ReduceOnPlateau learning rate scheduler with a patience of 5 epochs, reducing the learning rate when the validation loss plateaus. Training is terminated via early stopping with a patience of 7 epochs based on validation loss. The batch size is set to 6 for all experiments. The best-performing model checkpoint, selected based on the lowest validation loss, is used for all final evaluations on the held-out test set.
- 
+
+The optimiser is Adam~\cite{kingma2015adam} with an initial learning rate of $5 \times 10^{-5}$. We use a ReduceOnPlateau learning rate scheduler with a patience of 5 epochs, reducing the learning rate when the validation loss plateaus. Training is terminated via early stopping with a patience of 7 epochs based on validation loss. The batch size is set to 6 for all experiments. The best-performing model checkpoint, selected based on the lowest validation loss, is used for all final evaluations on the held-out test set.
+
 \subsubsection*{Parcellation}
- 
+
 To ensure accurate delineation of each region of interest (ROI), anatomical parcellation is performed on the original-resolution images prior to skull stripping and preprocessing. The resulting parcellation maps are then subjected to the same preprocessing pipeline as the MRI volumes to maintain spatial correspondence. Finally, the parcellations are registered to the corresponding preprocessed scans using nearest-neighbour interpolation, preserving discrete label integrity and ensuring correct alignment between the parcellation maps and the volumetric data.
 
 
@@ -51,27 +51,27 @@ To ensure accurate delineation of each region of interest (ROI), anatomical parc
 % ----------------------------------------------------------
 \subsection{Metrics}
 \label{sec:metrics}
- 
+
 We evaluate SynBADD along three complementary axes: image-level fidelity, region-level anatomical accuracy, and deformation-level plausibility. All metrics are computed on the brain-masked region and averaged over the five cross-validation folds.
- 
+
 \subsubsection*{Image-Level Metrics}
- 
-Peak signal-to-noise ratio (PSNR) quantifies voxel-level reconstruction accuracy as the ratio between the maximum possible signal intensity and the mean squared error between the synthesised and ground-truth scans. Higher values indicate greater intensity fidelity. The structural similarity index measure (SSIM)~[] evaluates perceptual similarity by comparing local patterns of luminance, contrast, and structure between the two images. SSIM operates on local windows and is more sensitive to structural distortions than purely voxel-wise metrics, making it particularly relevant for assessing anatomical coherence.
- 
+
+Peak signal-to-noise ratio (PSNR) quantifies voxel-level reconstruction accuracy as the ratio between the maximum possible signal intensity and the mean squared error between the synthesised and ground-truth scans. Higher values indicate greater intensity fidelity. The structural similarity index measure (SSIM)~\cite{wang2004ssim} evaluates perceptual similarity by comparing local patterns of luminance, contrast, and structure between the two images. SSIM operates on local windows and is more sensitive to structural distortions than purely voxel-wise metrics, making it particularly relevant for assessing anatomical coherence.
+
 \subsubsection*{Region-Level Metrics}
- 
-The Dice similarity coefficient measures the overlap between the anatomical parcellations of the synthesised and ground-truth scans for each region of interest. Given a region $R$ with predicted segmentation $\hat{S}_R$ and ground-truth segmentation $S_R$, the Dice coefficient is defined as:
- 
+
+The Dice similarity coefficient~\cite{dice1945} measures the overlap between the anatomical parcellations of the synthesised and ground-truth scans for each region of interest. Given a region $R$ with predicted segmentation $\hat{S}_R$ and ground-truth segmentation $S_R$, the Dice coefficient is defined as:
+
 \begin{equation}
 \text{Dice}(S_R, \hat{S}_R) = \frac{2 |S_R \cap \hat{S}_R|}{|S_R| + |\hat{S}_R|}
 \end{equation}
- 
-We compute Dice scores for eight brain regions relevant to Alzheimer's disease: hippocampus, parahippocampal gyrus, third ventricle, amygdala, entorhinal cortex, fusiform gyrus, inferior temporal gyrus, and middle temporal gyrus. These regions were selected on the basis of their known vulnerability to neurodegenerative atrophy and their established role as structural biomarkers in AD progression~[].
- 
+
+We compute Dice scores for eight brain regions relevant to Alzheimer's disease: hippocampus, parahippocampal gyrus, third ventricle, amygdala, entorhinal cortex, fusiform gyrus, inferior temporal gyrus, and middle temporal gyrus. These regions were selected on the basis of their known vulnerability to neurodegenerative atrophy and their established role as structural biomarkers in AD progression~\cite{braak1991neuropathological,jack2018nia,barnes2009atrophy}.
+
 In addition, we report the absolute volumetric difference (in voxels) and the relative volumetric difference (as a percentage of the ground-truth volume) for each region. This measures whether the synthesised scan preserves the volumetric properties of each structure, which is essential for downstream applications such as atrophy rate estimation and longitudinal biomarker tracking.
- 
+
 \subsubsection*{Deformation-Level Metrics}
- 
+
 To assess the anatomical plausibility of the predicted deformation fields, we examine the Jacobian determinant of the SVF at each spatial location. The Jacobian determinant $\det(J_{\hat{\phi}}(x))$ quantifies the local volume change induced by the deformation: values equal to 1 indicate volume preservation, values below 1 indicate contraction, and values above 1 indicate expansion. Negative values would indicate topology-violating folding, which is anatomically implausible. We report the mean and standard deviation of the Jacobian determinant across the brain volume for each test fold. In a cohort that includes subjects with MCI and AD, a mean Jacobian slightly below unity---reflecting mild net tissue atrophy---is expected and consistent with the known neurodegeneration patterns in these populations.
- 
+
 

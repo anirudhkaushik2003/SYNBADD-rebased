@@ -35,9 +35,9 @@
 \end{figure*}
 
 
-We address the problem of synthesizing a missing brain MRI scan at an intermediate timepoint in a subject's longitudinal imaging sequence by modelling anatomical deformations over time. Consider a subject with scans acquired at discrete timepoints $\{T_0, T_1, \dots, T_n\}$, where $T_0$ represents the baseline or initial screening scan obtained upon the subject's enrollment in the study and $T_i$ represents the scan at $i^{th}$ timepoint. Let $T_p \in \{T_1, \dots, T_n\}$ denote the timepoint at which the scan is missing. Each available scan $I_{T_i}$ is registered to the baseline $I_0$ using symmetric diffeomorphic registration via ANTs toolkit~\cite{}. This produces a stationary velocity field (SVF), denoted $\phi_{0 \rightarrow T_i}$, which encodes the deformation from the baseline to the timepoint $T_i$. These SVFs are used to learn latent representations of anatomical changes in the subject over the given timepoint, which are then used to predict the deformation for the missing timepoint.\\
+We address the problem of synthesizing a missing brain MRI scan at an intermediate timepoint in a subject's longitudinal imaging sequence by modelling anatomical deformations over time. Consider a subject with scans acquired at discrete timepoints $\{T_0, T_1, \dots, T_n\}$, where $T_0$ represents the baseline or initial screening scan obtained upon the subject's enrollment in the study and $T_i$ represents the scan at $i^{th}$ timepoint. Let $T_p \in \{T_1, \dots, T_n\}$ denote the timepoint at which the scan is missing. Each available scan $I_{T_i}$ is registered to the baseline $I_0$ using symmetric diffeomorphic registration via ANTs toolkit~\cite{avants2008ants}. This produces a stationary velocity field (SVF), denoted $\phi_{0 \rightarrow T_i}$, which encodes the deformation from the baseline to the timepoint $T_i$. These SVFs are used to learn latent representations of anatomical changes in the subject over the given timepoint, which are then used to predict the deformation for the missing timepoint.\\
 
-We aim to estimate the deformation $\hat{\phi}_{0 \rightarrow T_p }$ which corresponds to the SVF from the baseline scan to the missing timepoint $T_p$. The missing image $\hat{I}_{T_p}$ is synthesized by warping the baseline scan $I_0$ as per this predicted deformation. We approach this problem with three key assumptions. First, anatomical changes progress smoothly over time, even though the trajectory may not be strictly linear and may vary across subjects. Second, each deformation can be represented in a low-dimensional latent space that preserves both global structure and local anatomical detail. Third, the neighbouring timepoints of a subject can provide a useful context to infer the deformation at a missing timepoint. To address this, we propose a three-stage framework. We first learn a compact latent representations of the SVFs using a variational Auto-encoder. Next, we use a target-aware temporal transformer to infer the latent deformation at the missing timepoint by attending to relevant information across the available timepoints. Finally, the predicted deformation is refined and applied to the baseline scan to synthesize the missing image in an anatomically consistent manner. 
+We aim to estimate the deformation $\hat{\phi}_{0 \rightarrow T_p }$ which corresponds to the SVF from the baseline scan to the missing timepoint $T_p$. The missing image $\hat{I}_{T_p}$ is synthesized by warping the baseline scan $I_0$ as per this predicted deformation. We approach this problem with three key assumptions. First, anatomical changes progress smoothly over time, even though the trajectory may not be strictly linear and may vary across subjects. Second, each deformation can be represented in a low-dimensional latent space that preserves both global structure and local anatomical detail. Third, the neighbouring timepoints of a subject can provide a useful context to infer the deformation at a missing timepoint. To address this, we propose a three-stage framework. We first learn a compact latent representations of the SVFs using a variational Auto-encoder. Next, we use a target-aware temporal transformer to infer the latent deformation at the missing timepoint by attending to relevant information across the available timepoints. Finally, the predicted deformation is refined and applied to the baseline scan to synthesize the missing image in an anatomically consistent manner.
 
 % introduce a schematic diagramn and show graphically how the trajectory is modelled with the help of a transformer -> can we have an exp to show this?
 
@@ -102,7 +102,7 @@ and produces the pooled representation as a weighted combination of temporal fea
 \hat{z}_p = \sum_i \beta_i \tilde{H}_i
 \]
 
-By explicitly conditioning both the attention and pooling mechanisms on the target timepoint, we hypothesize the model is able to selectively extract temporal context relevant to the missing deformation. 
+By explicitly conditioning both the attention and pooling mechanisms on the target timepoint, we hypothesize the model is able to selectively extract temporal context relevant to the missing deformation.
 
 % This formulation enables flexible and robust inference across irregular sampling patterns and varying clinical trajectories, producing latent codes that are temporally and anatomically consistent.
 
@@ -133,59 +133,59 @@ All synthesis operations are performed at the original resolution to ensure fide
 % ----------------------------------------------------------
 \subsection{Training Objectives}
 \label{sec:training_objectives}
- 
+
 SynBADD is trained in two stages, each with a dedicated set of loss functions. The first stage trains the variational autoencoder to learn compact latent representations of SVFs. The second stage trains the temporal transformer and spatial refinement module end-to-end for missing scan synthesis.
- 
+
 \subsubsection*{Stage 1: VAE Pretraining}
- 
+
 The VAE is trained to reconstruct input SVFs while learning a regularised latent space. The objective combines four terms:
- 
+
 \begin{equation}
 \mathcal{L}_{\text{VAE}} = \lambda_{\text{recon}} \mathcal{L}_{\text{recon}} + \lambda_{\text{KL}} \mathcal{L}_{\text{KL}} + \lambda_{\text{EPE}} \mathcal{L}_{\text{EPE}} + \lambda_{\text{ang}} \mathcal{L}_{\text{ang}}
 \end{equation}
- 
+
 The reconstruction loss $\mathcal{L}_{\text{recon}}$ is the mean squared error between the input SVF $\phi_{0 \to T_i}$ and the reconstructed field $\hat{\phi}_{0 \to T_i}$, computed voxel-wise across all three spatial components of the velocity field. The Kullback--Leibler divergence $\mathcal{L}_{\text{KL}}$ regularises the approximate posterior $q(z_i | \phi_{0 \to T_i})$ towards a standard normal prior, encouraging a smooth and compact latent space.
- 
+
 To encourage fidelity in both the magnitude and direction of the reconstructed velocity vectors, we include two additional terms. The end-point error $\mathcal{L}_{\text{EPE}}$ measures the average Euclidean distance between the predicted and ground-truth velocity vectors at each spatial location:
- 
+
 \begin{equation}
 \mathcal{L}_{\text{EPE}} = \frac{1}{|\Omega|} \sum_{x \in \Omega} \| \hat{v}(x) - v(x) \|_2
 \end{equation}
- 
+
 The angular error loss $\mathcal{L}_{\text{ang}}$ penalises directional misalignment between predicted and ground-truth vectors, computed as the average angular deviation across spatial locations:
- 
+
 \begin{equation}
 \mathcal{L}_{\text{ang}} = \frac{1}{|\Omega|} \sum_{x \in \Omega} \arccos \left( \frac{\hat{v}(x) \cdot v(x)}{\| \hat{v}(x) \|_2 \, \| v(x) \|_2 + \epsilon} \right)
 \end{equation}
- 
+
 where $\epsilon$ is a small constant for numerical stability. Together, EPE and angular error ensure that the reconstructed SVF preserves both the scale and orientation of the original deformation field, which is important for maintaining anatomical plausibility in downstream synthesis.
- 
+
 \subsubsection*{Stage 2: Refinement and Synthesis}
- 
+
 The refinement module $G$ and the spatial transformer network are trained jointly using a composite objective that combines deformation-level and image-level losses:
- 
+
 \begin{equation}
 \mathcal{L}_{\text{synth}} = \lambda_{\text{def}} \mathcal{L}_{\text{def}} + \lambda_{\text{SSIM}} \mathcal{L}_{\text{SSIM}} + \lambda_{\text{MSE}} \mathcal{L}_{\text{MSE}} + \lambda_{\text{Jac}} \mathcal{L}_{\text{Jac}}
 \end{equation}
- 
-The deformation energy loss $\mathcal{L}_{\text{def}}$, inspired by LDDMM formulations~[], encourages smooth, diffeomorphic deformation fields by penalising excessive deformation energy:
- 
+
+The deformation energy loss $\mathcal{L}_{\text{def}}$, inspired by LDDMM formulations~\cite{beg2005lddmm,dalca2018unsupervised}, encourages smooth, diffeomorphic deformation fields by penalising excessive deformation energy:
+
 \begin{equation}
 \mathcal{L}_{\text{def}} = \int_{\Omega} \| \nabla \hat{\phi}_{0 \to T_p}(x) \|^2 \, dx
 \end{equation}
- 
+
 This term acts as a spatial regulariser, discouraging high-frequency deformation artifacts and promoting smoothly varying velocity fields.
- 
+
 The structural similarity loss $\mathcal{L}_{\text{SSIM}} = 1 - \text{SSIM}(\hat{I}_{T_p}, I_{T_p})$ promotes perceptual consistency between the synthesised scan $\hat{I}_{T_p}$ and the ground-truth target $I_{T_p}$, while the mean squared error loss $\mathcal{L}_{\text{MSE}} = \| \hat{I}_{T_p} - I_{T_p} \|^2$ enforces voxel-level intensity agreement. These two terms operate on the final warped image rather than on the deformation field itself, providing direct supervision on the synthesised output.
- 
+
 The Jacobian determinant regularisation $\mathcal{L}_{\text{Jac}}$ constrains the local volume change induced by the predicted deformation to remain within a biologically plausible range:
- 
+
 \begin{equation}
 \mathcal{L}_{\text{Jac}} = \frac{1}{|\Omega|} \sum_{x \in \Omega} \left( \det(J_{\hat{\phi}}(x)) - \tau \right)^2
 \end{equation}
- 
-where $\det(J_{\hat{\phi}}(x))$ is the Jacobian determinant of the predicted deformation at location $x$, and $\tau = 0.9$ is the target value. A target slightly below unity reflects the mild tissue contraction expected in a cohort that includes subjects undergoing neurodegenerative progression, where average atrophy rates in the range of 0.3--5\% per year have been reported depending on clinical stage~[]. This regularisation discourages both excessive shrinkage and implausible tissue expansion, anchoring the predicted deformations to physiologically realistic patterns.
- 
+
+where $\det(J_{\hat{\phi}}(x))$ is the Jacobian determinant of the predicted deformation at location $x$, and $\tau = 0.9$ is the target value. A target slightly below unity reflects the mild tissue contraction expected in a cohort that includes subjects undergoing neurodegenerative progression, where average atrophy rates in the range of 0.3--5\% per year have been reported depending on clinical stage~\cite{barnes2009atrophy}. This regularisation discourages both excessive shrinkage and implausible tissue expansion, anchoring the predicted deformations to physiologically realistic patterns.
+
 The loss weights are set as $\lambda_{\text{def}} = 0.5$, $\lambda_{\text{SSIM}} = 0.05$, $\lambda_{\text{MSE}} = 0.05$, and $\lambda_{\text{Jac}}$ is tuned on the validation set. The higher weight on the deformation energy term reflects its importance in maintaining diffeomorphic properties, while the image-level losses provide complementary supervision on the final output.
 
 
@@ -196,7 +196,7 @@ The loss weights are set as $\lambda_{\text{def}} = 0.5$, $\lambda_{\text{SSIM}}
 
 % This problem is framed under the assumptions that: (i) anatomical changes follow a smooth, albeit possibly nonlinear, temporal trajectory., (ii) Each deformation can be encoded as a compact latent representation, (iii) Temporal modeling can effectively interpolate missing deformations using bidirectional context.
 
-% Ground truth SVFs are generated using regularized symmetric diffeomorphic registration (VoxelMorph). All predicted fields are treated as SVFs 
+% Ground truth SVFs are generated using regularized symmetric diffeomorphic registration (VoxelMorph). All predicted fields are treated as SVFs
 
 % \subsection{Latent SVF Encoding and Synthetic Augmentation}
 
