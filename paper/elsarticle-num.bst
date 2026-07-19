@@ -1038,7 +1038,7 @@ FUNCTION {make.href.hypertex}
 }
 FUNCTION {make.href.hyperref}
 {
-  "\href {" swap$ * "} {\path{" * swap$ * "}}" *
+  "\href {" swap$ * "} {\url{" * swap$ * "}}" *
 }
 FUNCTION {make.href}
 { hrefform #2 =
@@ -1485,7 +1485,7 @@ FUNCTION {begin.bib}
   write$ newline$
   "\expandafter\ifx\csname href\endcsname\relax"
   write$ newline$
-  "  \def\href#1#2{#2} \def\path#1{#1}\fi"
+  "  \def\href#1#2{#2} \def\path#1{\url{#1}}\fi"
   write$ newline$
 }
 

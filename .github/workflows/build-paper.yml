@@ -22,8 +22,8 @@ jobs:
           working_directory: paper
           root_file: SynBADD.tex
           latexmk_use_lualatex: false
-          pre_compile: latex elsarticle.ins
-          args: -pdf -interaction=nonstopmode -file-line-error
+          pre_compile: latex elsarticle.ins && latexmk -C SynBADD.tex
+          args: -pdf -interaction=nonstopmode -file-line-error -halt-on-error
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
