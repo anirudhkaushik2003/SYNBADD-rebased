@@ -10,16 +10,15 @@ Output:
     paper/images/exp1_cross_model_delta.pdf
 """
 
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from _style import MODEL_COLOR, MODEL_LABEL, apply_style, save_pdf
+from _style import (MODEL_COLOR, MODEL_LABEL, OUTPUT_ROOT, apply_style,
+                    save_pdf)
 
 
-SIG_CSV = Path("/scratch/anirudhkaushik/SYNBADD_outputs/significance_tests_fold2/significance_tests.csv")
+SIG_CSV = OUTPUT_ROOT / "significance_tests_fold2" / "significance_tests.csv"
 
 
 def main():

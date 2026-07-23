@@ -4,6 +4,7 @@ Each individual figure script imports from here so styling is consistent.
 Edit this file to change fonts, colors, sizes, etc. globally.
 """
 
+import os
 from pathlib import Path
 
 import matplotlib as mpl
@@ -15,7 +16,24 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[2]
 IMG_DIR = REPO / "paper" / "images"
-QUAL = Path("/scratch/anirudhkaushik/SYNBADD_outputs/SYNBADD_Qualitative_2")
+
+
+def _output_root() -> Path:
+    """Locate experiment outputs on the cluster, backup drive, or an override."""
+    override = os.environ.get("SYNBADD_OUTPUT_ROOT")
+    if override:
+        return Path(override).expanduser()
+
+    candidates = [
+        Path("/scratch/anirudhkaushik/SYNBADD_outputs"),
+        Path(r"F:\anirudhkaushik\SYNBADD_outputs"),
+        Path(r"F:\anirudhkaushik\data\SYNBADD_outputs"),
+    ]
+    return next((path for path in candidates if path.is_dir()), candidates[0])
+
+
+OUTPUT_ROOT = _output_root()
+QUAL = OUTPUT_ROOT / "SYNBADD_Qualitative_2"
 
 EXP_DIRS = {
     ("main", "exp1"): QUAL / "experiment_reduced_time_input_fold_2"
