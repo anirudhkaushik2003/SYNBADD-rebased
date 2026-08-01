@@ -519,9 +519,9 @@ Quantitative metrics capture global image fidelity but may not reveal localised 
 
 Figure~\ref{fig:slice_consistency} compares five consecutive axial slices from the same held-out subject and target visit. NODER remains spatially continuous but shows a localized boundary protrusion that shifts across adjacent slices (red circles). ReMiND retains the principal anatomy but exhibits visibly stronger intensity variability and an abrupt appearance change in the central slice. SynBADD follows the target anatomy consistently across the sequence without the highlighted NODER displacement or the slice-to-slice intensity discontinuity visible in ReMiND. This comparison is particularly relevant because SynBADD predicts a single 3D deformation field, whereas ReMiND constructs the volume from generated batches of 2D slices.
 
-\begin{figure*}[t!]
+\begin{figure*}[p]
     \centering
-    \includegraphics[width=0.56\textwidth]{images/qualitative-slice-consistency.pdf}
+    \includegraphics[width=0.96\textwidth,height=0.82\textheight,keepaspectratio]{images/qualitative-slice-consistency.pdf}
     \caption{Slice-level consistency for a representative held-out subject at the requested target visit. Five consecutive axial slices are shown for the target, NODER, SynBADD, and ReMiND. Red circles mark a localized NODER boundary displacement that changes across slices; SynBADD remains close to the target across the displayed sequence, while ReMiND shows greater intensity and appearance variation. All methods are compared for the same subject, target visit, and slice indices.}
     \label{fig:slice_consistency}
 \end{figure*}
@@ -530,8 +530,8 @@ Figure~\ref{fig:diffmaps} shows two additional exact subject--visit matches toge
 
 \begin{figure*}[p]
     \centering
-    \includegraphics[width=0.76\textwidth]{images/qualitative-difference-maps-1.pdf}\\[0.5em]
-    \includegraphics[width=0.76\textwidth]{images/qualitative-difference-maps-2.pdf}
+    \includegraphics[width=0.92\textwidth,height=0.39\textheight,keepaspectratio]{images/qualitative-difference-maps-1.pdf}\\[0.25em]
+    \includegraphics[width=0.92\textwidth,height=0.39\textheight,keepaspectratio]{images/qualitative-difference-maps-2.pdf}
     \caption{Qualitative SOTA comparison and signed difference maps for two representative held-out subject--visit pairs (top and bottom). Each panel shows the target scan and predictions from NODER, SynBADD, and ReMiND at the same middle axial slice; the lower row of each panel shows prediction-minus-target residuals using the accompanying diverging color scale. Subject, diagnostic-group, age, sex, and target-visit information are reported inside each panel.}
     \label{fig:diffmaps}
 \end{figure*}
