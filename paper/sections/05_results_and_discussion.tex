@@ -517,17 +517,24 @@ Quantitative metrics capture global image fidelity but may not reveal localised 
 % ----------------------------------------------------------
 \subsubsection{Visual Comparison of Predicted Scans}
 
-Figures~\ref{fig:slicewise_1} and~\ref{fig:slicewise_2} present consecutive axial slices (slices 62--66) of synthesised scans for two representative subjects, comparing SynBADD, NODER, and ReMiND against the ground-truth target.
+Figure~\ref{fig:slice_consistency} compares five consecutive axial slices from the same held-out subject and target visit. NODER remains spatially continuous but shows a localized boundary protrusion that shifts across adjacent slices (red circles). ReMiND retains the principal anatomy but exhibits visibly stronger intensity variability and an abrupt appearance change in the central slice. SynBADD follows the target anatomy consistently across the sequence without the highlighted NODER displacement or the slice-to-slice intensity discontinuity visible in ReMiND. This comparison is particularly relevant because SynBADD predicts a single 3D deformation field, whereas ReMiND constructs the volume from generated batches of 2D slices.
 
-ReMiND, which reconstructs the volume from generated slice batches, exhibits noticeable inter-slice inconsistencies. Intensity discontinuities and hole-like artifacts are visible between adjacent slices, most prominently between slices 63 and 64, where both signal quality and anatomical coherence degrade. These spatial discontinuities compromise the volumetric integrity of the reconstructed scan and would limit its reliability in any downstream analysis that depends on 3D spatial relationships, such as segmentation or morphometric measurement.
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[width=0.56\textwidth]{images/qualitative-slice-consistency.pdf}
+    \caption{Slice-level consistency for a representative held-out subject at the requested target visit. Five consecutive axial slices are shown for the target, NODER, SynBADD, and ReMiND. Red circles mark a localized NODER boundary displacement that changes across slices; SynBADD remains close to the target across the displayed sequence, while ReMiND shows greater intensity and appearance variation. All methods are compared for the same subject, target visit, and slice indices.}
+    \label{fig:slice_consistency}
+\end{figure*}
 
-NODER, as a deformation-based method, maintains volumetric continuity across slices. However, it tends to overestimate local deformations in certain regions, producing protrusion-like artifacts where tissue boundaries are displaced beyond their ground-truth positions. This is consistent with the observation that NODER fits subject-specific trajectories through regression, which can amplify small estimation errors into localised geometric distortions.
+Figure~\ref{fig:diffmaps} shows two additional exact subject--visit matches together with signed voxelwise residuals. The residual is prediction minus target after applying the same normalization convention, so red and blue denote positive and negative intensity error, respectively. In both examples, SynBADD's residual is lower in magnitude and less spatially extensive than NODER's. ReMiND shows broader residual structure and a conspicuous background/intensity offset, consistent with the differences visible in its synthesized slice. These examples illustrate the local character of the remaining SynBADD error; they are qualitative representatives rather than a substitute for the aggregate metrics in Tables~\ref{tab:sota_noder} and~\ref{tab:sota_remind}.
 
-SynBADD preserves smooth anatomical transitions across all consecutive slices, with no visible discontinuities or exaggerated deformations. The cortical folds, ventricular boundaries, and subcortical structures are consistently rendered across the slice sequence, reflecting the inherent spatial coherence of its 3D deformation-based synthesis.
-
-Figure~\ref{fig:diffmaps} presents voxel-wise difference maps between the synthesised and ground-truth scans, displayed as signed error fields in which blue indicates negative intensity differences, red indicates positive differences, and white corresponds to zero error. SynBADD achieves substantially lower error magnitudes across the brain volume compared to both baselines. ReMiND produces widespread errors, particularly in cortical and ventricular regions, reflecting the cumulative effect of slice-batch synthesis artifacts across the volume. NODER shows more localised but pronounced errors along tissue boundaries, consistent with its tendency to overestimate deformation magnitudes. The error distribution of SynBADD is both smaller in magnitude and more spatially uniform, with residual errors concentrated primarily in regions where the ground-truth deformation itself is largest---an expected pattern for a method that models deformation rather than absolute appearance.
-
-Figure~\ref{fig:finegrained} provides a detailed view of SynBADD's capacity to capture subtle, localised anatomical changes. In this visualisation, the baseline scan is warped to the target timepoint using the predicted SVF, and the resulting image is compared against both the ground truth and the original baseline. Regions where fine-grained atrophy has been accurately captured by the warping are highlighted, alongside regions where the warped scan diverges from the undeformed baseline. The comparison confirms that SynBADD is sensitive to small but clinically meaningful changes---such as hippocampal volume reduction and ventricular expansion---that are characteristic of early neurodegenerative progression~\cite{braak1991neuropathological,barnes2009atrophy}. This sensitivity is consistent with operating in deformation space, where the model's entire generative capacity is directed toward estimating the transformation rather than reconstructing the full intensity volume from scratch.
+\begin{figure*}[p]
+    \centering
+    \includegraphics[width=0.76\textwidth]{images/qualitative-difference-maps-1.pdf}\\[0.5em]
+    \includegraphics[width=0.76\textwidth]{images/qualitative-difference-maps-2.pdf}
+    \caption{Qualitative SOTA comparison and signed difference maps for two representative held-out subject--visit pairs (top and bottom). Each panel shows the target scan and predictions from NODER, SynBADD, and ReMiND at the same middle axial slice; the lower row of each panel shows prediction-minus-target residuals using the accompanying diverging color scale. Subject, diagnostic-group, age, sex, and target-visit information are reported inside each panel.}
+    \label{fig:diffmaps}
+\end{figure*}
 
 
 % ----------------------------------------------------------
@@ -535,13 +542,16 @@ Figure~\ref{fig:finegrained} provides a detailed view of SynBADD's capacity to c
 % ----------------------------------------------------------
 \subsubsection{Visualization of Predicted Deformation Fields}
 
-To provide further insight into what the model has learned, we visualise the predicted stationary velocity fields directly. Figure~\ref{fig:svf_vis} displays the SVF for a representative subject, rendered as an RGB-mapped velocity field overlaid on axial, coronal, and sagittal views, where each colour channel encodes the velocity component along one spatial axis and the intensity reflects the local magnitude of the deformation.
+Figure~\ref{fig:deformation_view} links the image-space result to the predicted deformation for three held-out examples. The baseline, target, and SynBADD-warped scans remain closely aligned in gross anatomy. The two rightmost columns compare Jacobian-determinant maps computed from the integrated synthesized and ground-truth SVFs using a shared within-case scale. The synthesized maps reproduce the broad spatial pattern of local contraction and expansion in the reference while remaining smooth. This supports the quantitative Jacobian analysis without attributing individual colored regions to a specific anatomical process solely from the visualization.
 
-The predicted deformations are spatially concentrated in regions known to be vulnerable to neurodegeneration in Alzheimer's disease: the medial temporal lobe, hippocampal formation, and periventricular areas. Deformation magnitudes are minimal in stable structures such as the brainstem and cerebellum, which is consistent with the known spatial distribution of AD-related atrophy~\cite{braak1991neuropathological,barnes2009atrophy}. This pattern confirms that the model has not learned arbitrary spatial warps, but rather biologically interpretable transformations that reflect the expected progression of neurodegeneration.
+\begin{figure*}[t!]
+    \centering
+    \includegraphics[width=0.88\textwidth]{images/qualitative-deformation-view.pdf}
+    \caption{Image- and deformation-space comparison for three representative held-out cases. From left to right: screening baseline, target scan, SynBADD-warped scan, Jacobian determinant of the integrated synthesized SVF, and Jacobian determinant of the integrated ground-truth SVF. Each row uses a matched subject and target visit; the two determinant maps use the displayed case-specific color scale.}
+    \label{fig:deformation_view}
+\end{figure*}
 
-We additionally examine the Jacobian determinant of the predicted deformation field, which quantifies local volume change at each spatial location. Values below unity indicate tissue contraction, while values above unity indicate expansion. Figure~\ref{fig:jacobian_map} shows the Jacobian determinant map for a representative case, overlaid on the corresponding anatomical slice. Regions of mild contraction (Jacobian values slightly below 1.0) are localised to the hippocampus, parahippocampal gyrus, and temporal cortex, while the ventricular system shows slight expansion---a pattern that is characteristic of progressive brain atrophy and is consistent with the literature on volumetric changes in AD~\cite{barnes2009atrophy}. The absence of negative Jacobian values across the field confirms that the predicted deformation is diffeomorphic, preserving the topology of the underlying anatomy.
-
-These qualitative analyses reinforce the quantitative findings and provide interpretable evidence that SynBADD produces not only metrically accurate but also anatomically meaningful and clinically plausible imputations.
+Together, these qualitative results complement the aggregate image and regional metrics: SynBADD preserves adjacent-slice coherence, produces comparatively localized residuals in the displayed examples, and predicts smooth deformation patterns that broadly agree with the reference fields.
 
 % # volume diff as boxplots
 % # dice diff as box plots

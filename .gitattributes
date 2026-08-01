@@ -1,0 +1,16 @@
+# Keep source files byte-stable across Windows development and Linux CI.
+/.gitattributes text eol=lf
+*.tex  text eol=lf
+*.bib  text eol=lf
+*.bst  text eol=lf
+*.cls  text eol=lf
+*.dtx  text eol=lf
+*.ins  text eol=lf
+*.py   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf
+
+# Publication assets are binary.
+*.pdf binary
+*.png binary
