@@ -44,9 +44,9 @@ def main():
     ax.set_aspect("equal")
     ax.set_xlabel(r"EPE under past-input mask ($-$m06)")
     ax.set_ylabel(r"EPE under future-input mask (mean over $-$m18, $-$m24, $-$m36)")
-    ax.set_title("Exp.~2 -- Past vs.\\ future masking, MCI cohort\n(No UNet$+$No DAFT)")
-    ax.legend(loc="lower right")
-    fig.tight_layout()
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.02),
+              borderaxespad=0)
+    fig.tight_layout(rect=(0, 0, 1, 0.86))
 
     out = save_pdf(fig, "exp2_past_vs_future_scatter")
     print(f"saved {out}")

@@ -25,11 +25,7 @@ def main():
     _, dice_main = load("main", "exp1")
     _, dice_nu   = load("nounet", "exp1")
 
-    groups = [
-        ("CN",  "Cognitively Normal (CN)"),
-        ("MCI", "Mild Cognitive Impairment (MCI)"),
-        ("AD",  "Alzheimer's Disease (AD)"),
-    ]
+    groups = ["CN", "MCI", "AD"]
 
     fig, axes = plt.subplots(3, 1, figsize=(11.0, 9.0), sharex=True)
 
@@ -38,7 +34,7 @@ def main():
     bar_w = 0.20
     x = np.arange(n_reg)
 
-    for ax, (grp, full_title) in zip(axes, groups):
+    for ax, grp in zip(axes, groups):
         # Each model: K=full, K=1
         bars = []
         for offset, (model, dice, color) in enumerate([
@@ -72,21 +68,17 @@ def main():
                         alpha=0.55, hatch="//", label=MODEL_LABEL[model] + r" ($K{=}1$)")
             bars.extend([b1, b2])
 
-        ax.set_ylabel("Dice")
+        ax.set_ylabel(f"{grp}\nDice")
         ax.set_ylim(0.78, 1.005)
-        ax.set_title(full_title, fontsize=10)
         ax.grid(True, axis="y", alpha=0.25)
 
     axes[-1].set_xticks(x)
     axes[-1].set_xticklabels(region_labels, rotation=30, ha="right")
 
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=4,
-               bbox_to_anchor=(0.5, -0.02))
-
-    fig.suptitle(r"Exp.~1 -- Per-region Dice at full context vs.\ source-only ($K{=}1$)",
-                 y=0.995)
-    fig.tight_layout(rect=(0, 0.04, 1, 0.99))
+    fig.legend(handles, labels, loc="upper center", ncol=4,
+               bbox_to_anchor=(0.5, 1.02))
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
     out = save_pdf(fig, "exp1_per_region_bars")
     print(f"saved {out}")
     plt.close(fig)

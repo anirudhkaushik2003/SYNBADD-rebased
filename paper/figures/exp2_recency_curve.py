@@ -42,9 +42,9 @@ def main():
 
     ax.set_xlabel("Masked-input distance from target (months)")
     ax.set_ylabel("EPE (voxels)")
-    ax.set_title(r"Exp.~2 -- Recency effect: EPE vs.\ masked-input distance")
-    ax.legend(loc="upper left")
-    fig.tight_layout()
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.02),
+              ncol=2, borderaxespad=0)
+    fig.tight_layout(rect=(0, 0, 1, 0.86))
 
     out = save_pdf(fig, "exp2_recency_curve")
     print(f"saved {out}")

@@ -44,9 +44,9 @@ def main():
         ax.set_xticks(range(0, 5))
 
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.05))
-    fig.suptitle("Exp.~1 -- Image-level metrics under reduced input timepoints", y=1.02)
-    fig.tight_layout()
+    fig.legend(handles, labels, loc="upper center", ncol=3,
+               bbox_to_anchor=(0.5, 1.02))
+    fig.tight_layout(rect=(0, 0, 1, 0.86))
     out = save_pdf(fig, "exp1_image_metrics")
     print(f"saved {out}")
     plt.close(fig)

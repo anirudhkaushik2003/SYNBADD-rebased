@@ -60,11 +60,11 @@ def main():
 
     ax.axhline(0, color="black", lw=0.5)
     ax.set_xticks(x)
-    ax.set_xticklabels([m[1] for m in metrics])
+    ax.set_xticklabels([m[1] for m in metrics], rotation=15, ha="right")
     ax.set_ylabel(r"Mean per-subject $\Delta$ ($n_{\mathrm{drop}}{=}0 \rightarrow 2$)")
-    ax.set_title(r"Exp.~1 -- Cross-model paired-$\Delta$ (cohort-stable, $n{=}76$)")
-    ax.legend(loc="upper right")
-    fig.tight_layout()
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.02),
+              ncol=2, borderaxespad=0)
+    fig.tight_layout(rect=(0, 0, 1, 0.86))
 
     out = save_pdf(fig, "exp1_cross_model_delta")
     print(f"saved {out}")

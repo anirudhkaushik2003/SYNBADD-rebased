@@ -19,9 +19,9 @@ def main():
     _, dice_nu   = load("nounet", "exp1")
 
     fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.6), sharey=True)
-    titles = [MODEL_LABEL["main"], MODEL_LABEL["nounet"]]
+    models = [(dice_main, "main"), (dice_nu, "nounet")]
 
-    for ax, dice, title in zip(axes, [dice_main, dice_nu], titles):
+    for ax, (dice, model) in zip(axes, models):
         # Per-subject avg over ROIs, then group by (subject, group, n_dropped)
         avg = (dice.groupby(["subject", "group", "n_dropped"])["dice"].mean()
                    .reset_index())
@@ -35,16 +35,20 @@ def main():
             ax.errorbar(
                 mean.index, mean.values, yerr=sem.values,
                 fmt="o-", color=GROUP_COLOR[grp], capsize=2, lw=1.0, ms=4,
-                label=grp,
+                label=f"{grp} ({MODEL_LABEL[model]})",
             )
         ax.set_xlabel("Inputs dropped (nearest-first)")
         ax.set_xticks(range(0, 5))
-        ax.set_title(title)
 
     axes[0].set_ylabel("Mean Dice (avg over 8 ROIs)")
-    axes[1].legend(title="Group", loc="lower left")
-    fig.suptitle("Exp.~1 -- Dice degradation under reduced input timepoints", y=1.02)
-    fig.tight_layout()
+    handles, labels = [], []
+    for ax in axes:
+        ax_handles, ax_labels = ax.get_legend_handles_labels()
+        handles.extend(ax_handles)
+        labels.extend(ax_labels)
+    fig.legend(handles, labels, loc="upper center", ncol=3,
+               bbox_to_anchor=(0.5, 1.02))
+    fig.tight_layout(rect=(0, 0, 1, 0.84))
     out = save_pdf(fig, "exp1_dice_curves")
     print(f"saved {out}")
     plt.close(fig)
