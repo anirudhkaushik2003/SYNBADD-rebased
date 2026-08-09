@@ -37,16 +37,16 @@ def main():
     ax.scatter(past, fut, color=MODEL_COLOR["nounet"], s=22,
                edgecolor="black", lw=0.4, alpha=0.85)
 
-    lim = [min(past.min(), fut.min()) * 0.95, max(past.max(), fut.max()) * 1.05]
-    ax.plot(lim, lim, "k--", lw=0.6, label=r"$y=x$")
+    low = min(past.min(), fut.min())
+    high = max(past.max(), fut.max())
+    span = high - low
+    lim = [low - span * 0.10, high + span * 0.10]
     ax.set_xlim(lim)
     ax.set_ylim(lim)
     ax.set_aspect("equal")
-    ax.set_xlabel(r"EPE under past-input mask ($-$m06)")
-    ax.set_ylabel(r"EPE under future-input mask (mean over $-$m18, $-$m24, $-$m36)")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.02),
-              borderaxespad=0)
-    fig.tight_layout(rect=(0, 0, 1, 0.86))
+    ax.set_xlabel("Past-mask EPE")
+    ax.set_ylabel("Future-mask EPE")
+    fig.tight_layout()
 
     out = save_pdf(fig, "exp2_past_vs_future_scatter")
     print(f"saved {out}")

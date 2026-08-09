@@ -62,7 +62,7 @@ def main():
 
             b1 = ax.bar(x + shift_full, full_vals, bar_w, yerr=full_sem,
                         capsize=1.6, color=color, edgecolor="black", lw=0.4,
-                        alpha=0.95, label=f"{MODEL_LABEL[model]} (full)")
+                        alpha=0.95, label=MODEL_LABEL[model])
             b2 = ax.bar(x + shift_min,  min_vals,  bar_w, yerr=min_sem,
                         capsize=1.6, color=color, edgecolor="black", lw=0.4,
                         alpha=0.55, hatch="//", label=MODEL_LABEL[model] + r" ($K{=}1$)")

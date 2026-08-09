@@ -34,37 +34,53 @@ def main():
                ("dice_avg_roi", "Dice (avg ROIs)")]
     cm = cm.set_index("metric").reindex([m[0] for m in metrics])
 
-    fig, ax = plt.subplots(figsize=(7.5, 3.8))
-    x = np.arange(len(metrics))
+    fig, axes = plt.subplots(2, 2, figsize=(8.5, 5.7))
+    axes = axes.ravel()
     w = 0.36
 
     main_d = cm["model_a_mean_delta"].values
     nu_d   = cm["model_b_mean_delta"].values
 
-    bars1 = ax.bar(x - w/2, main_d, w, color=MODEL_COLOR["main"],
-                   label=MODEL_LABEL["main"], edgecolor="black", lw=0.4)
-    bars2 = ax.bar(x + w/2, nu_d, w, color=MODEL_COLOR["nounet"],
-                   label=MODEL_LABEL["nounet"], edgecolor="black", lw=0.4)
-
-    for i, (b1, b2) in enumerate(zip(bars1, bars2)):
+    for i, (ax, metric, label, main_value, nounet_value) in enumerate(
+            zip(axes, [m[0] for m in metrics], [m[1] for m in metrics],
+                main_d, nu_d)):
+        values = [main_value, nounet_value]
+        bars1 = ax.bar([-0.5], [main_value], w, color=MODEL_COLOR["main"],
+                       label=MODEL_LABEL["main"], edgecolor="black", lw=0.4)
+        bars2 = ax.bar([0.5], [nounet_value], w, color=MODEL_COLOR["nounet"],
+                       label=MODEL_LABEL["nounet"], edgecolor="black", lw=0.4)
+        magnitude = max(abs(value) for value in values)
+        pad = max(magnitude * 0.18, 1e-4)
         p = cm["p_value"].iloc[i]
         if pd.isna(p):
-            continue
-        if p < 0.001:   marker = r"$***$"
-        elif p < 0.01:  marker = r"$**$"
-        elif p < 0.05:  marker = r"$*$"
-        else:           marker = "ns"
-        top = max(abs(b1.get_height()), abs(b2.get_height()))
-        ax.text(i, top * 1.18 if top > 0 else 0.0005, marker,
-                ha="center", va="bottom", fontsize=10)
+            marker = ""
+        elif p < 0.001:
+            marker = "***"
+        elif p < 0.01:
+            marker = "**"
+        elif p < 0.05:
+            marker = "*"
+        else:
+            marker = "ns"
+        for xpos, value in zip([-0.5, 0.5], values):
+            offset = pad if value >= 0 else -pad
+            ax.text(xpos, value + offset, f"{value:.3g}", ha="center",
+                    va="bottom" if value >= 0 else "top", fontsize=8)
+        if marker:
+            ax.text(0, max(values) + pad * 2, marker, ha="center",
+                    va="bottom", fontsize=10)
+        ax.set_title(label, fontsize=10)
+        ax.set_xticks([-0.5, 0.5])
+        ax.set_xticklabels(["Full", "No refinement"])
+        ax.set_ylim(min(min(values) - pad * 3, -pad), max(values) + pad * 4)
+        ax.grid(True, axis="y", alpha=0.25)
 
-    ax.axhline(0, color="black", lw=0.5)
-    ax.set_xticks(x)
-    ax.set_xticklabels([m[1] for m in metrics], rotation=15, ha="right")
-    ax.set_ylabel(r"Mean per-subject $\Delta$ ($n_{\mathrm{drop}}{=}0 \rightarrow 2$)")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.02),
-              ncol=2, borderaxespad=0)
-    fig.tight_layout(rect=(0, 0, 1, 0.86))
+    axes[0].set_ylabel(r"Mean per-subject $\Delta$")
+    axes[2].set_ylabel(r"Mean per-subject $\Delta$")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.02),
+               ncol=2, borderaxespad=0)
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
 
     out = save_pdf(fig, "exp1_cross_model_delta")
     print(f"saved {out}")
