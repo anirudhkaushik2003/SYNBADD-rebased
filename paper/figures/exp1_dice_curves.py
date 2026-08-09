@@ -18,7 +18,7 @@ def main():
     _, dice_main = load("main", "exp1")
     _, dice_nu   = load("nounet", "exp1")
 
-    fig, axes = plt.subplots(2, 1, figsize=(8.5, 6.8), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 1, figsize=(8.5, 5.8), sharex=True, sharey=True)
     models = [(dice_main, "main"), (dice_nu, "nounet")]
 
     for ax, (dice, model) in zip(axes, models):
@@ -38,15 +38,16 @@ def main():
                 label=grp,
             )
         ax.set_xticks(range(0, 5))
-        ax.set_ylabel("Mean Dice (avg over 8 ROIs)")
         ax.text(0.03, 0.95, MODEL_LABEL[model], transform=ax.transAxes,
-            ha="left", va="top", fontsize=10, fontweight="bold")
+                ha="left", va="top", fontsize=10, fontweight="bold")
 
     axes[-1].set_xlabel("Inputs dropped (nearest-first)")
+    fig.text(0.02, 0.50, "Mean Dice (avg over 8 ROIs)", rotation="vertical",
+             va="center", ha="center")
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, title="Diagnostic group", loc="upper center", ncol=3,
-               bbox_to_anchor=(0.5, 1.02))
-    fig.tight_layout(rect=(0, 0, 1, 0.86))
+    fig.legend(handles, labels, loc="upper center", ncol=3,
+               bbox_to_anchor=(0.5, 0.995), borderaxespad=0)
+    fig.tight_layout(rect=(0.08, 0.02, 1, 0.91), h_pad=0.8)
     out = save_pdf(fig, "exp1_dice_curves")
     print(f"saved {out}")
     plt.close(fig)
