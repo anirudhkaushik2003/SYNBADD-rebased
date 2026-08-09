@@ -51,24 +51,10 @@ def main():
                        label=MODEL_LABEL["nounet"], edgecolor="black", lw=0.4)
         magnitude = max(abs(value) for value in values)
         pad = max(magnitude * 0.18, 1e-4)
-        p = cm["p_value"].iloc[i]
-        if pd.isna(p):
-            marker = ""
-        elif p < 0.001:
-            marker = "***"
-        elif p < 0.01:
-            marker = "**"
-        elif p < 0.05:
-            marker = "*"
-        else:
-            marker = "ns"
         for xpos, value in zip([-0.5, 0.5], values):
             offset = pad if value >= 0 else -pad
             ax.text(xpos, value + offset, f"{value:.3g}", ha="center",
                     va="bottom" if value >= 0 else "top", fontsize=8)
-        if marker:
-            ax.text(0, max(values) + pad * 2, marker, ha="center",
-                    va="bottom", fontsize=10)
         ax.set_title(label, fontsize=10)
         ax.set_xticks([-0.5, 0.5])
         ax.set_xticklabels(["Full", "No refinement"])
