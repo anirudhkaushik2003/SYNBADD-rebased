@@ -18,36 +18,40 @@ def main():
     _, dice_main = load("main", "exp1")
     _, dice_nu   = load("nounet", "exp1")
 
-    fig, axes = plt.subplots(2, 1, figsize=(8.5, 5.8), sharex=True, sharey=True)
+    fig, axes = plt.subplots(3, 2, figsize=(9.0, 8.0), sharex=True, sharey=True)
     models = [(dice_main, "main"), (dice_nu, "nounet")]
+    groups = ["CN", "MCI", "AD"]
 
-    for ax, (dice, model) in zip(axes, models):
-        # Per-subject avg over ROIs, then group by (subject, group, n_dropped)
+    for col, (dice, model) in enumerate(models):
+        # Per-subject average over ROIs, then summarize each diagnostic group.
         avg = (dice.groupby(["subject", "group", "n_dropped"])["dice"].mean()
                    .reset_index())
-        for grp in ["CN", "MCI", "AD"]:
+        for row, grp in enumerate(groups):
+            ax = axes[row, col]
             sub = avg[avg.group == grp]
-            if sub.empty:
-                continue
-            mean = sub.groupby("n_dropped")["dice"].mean().sort_index()
-            count = sub.groupby("n_dropped")["dice"].count().sort_index()
-            sem = (sub.groupby("n_dropped")["dice"].std() / np.sqrt(count)).sort_index()
-            ax.errorbar(
-                mean.index, mean.values, yerr=sem.values,
-                fmt="o-", color=GROUP_COLOR[grp], capsize=2, lw=1.0, ms=4,
-                label=grp,
-            )
-        ax.set_xticks(range(0, 5))
-        ax.text(0.03, 0.95, MODEL_LABEL[model], transform=ax.transAxes,
-                ha="left", va="top", fontsize=10, fontweight="bold")
+            if not sub.empty:
+                mean = sub.groupby("n_dropped")["dice"].mean().sort_index()
+                count = sub.groupby("n_dropped")["dice"].count().sort_index()
+                sem = (sub.groupby("n_dropped")["dice"].std() /
+                       np.sqrt(count)).sort_index().fillna(0)
+                ax.errorbar(
+                    mean.index, mean.values, yerr=sem.values,
+                    fmt="o-", color=GROUP_COLOR[grp], capsize=2, lw=1.2, ms=4,
+                )
+            ax.set_xticks(range(0, 5))
+            ax.text(0.04, 0.92, grp, transform=ax.transAxes,
+                    ha="left", va="top", fontsize=10, fontweight="bold")
+            ax.grid(True, axis="both", alpha=0.22)
 
-    axes[-1].set_xlabel("Inputs dropped (nearest-first)")
-    fig.text(0.02, 0.50, "Mean Dice (avg over 8 ROIs)", rotation="vertical",
+        axes[0, col].set_title(MODEL_LABEL[model], fontsize=11, pad=8)
+
+    for ax in axes[:, 0]:
+        ax.set_ylabel("Mean Dice")
+    for ax in axes[-1, :]:
+        ax.set_xlabel("Inputs dropped")
+    fig.text(0.02, 0.50, "Mean Dice (average over 8 ROIs)", rotation="vertical",
              va="center", ha="center")
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=3,
-               bbox_to_anchor=(0.5, 0.995), borderaxespad=0)
-    fig.tight_layout(rect=(0.08, 0.02, 1, 0.91), h_pad=0.8)
+    fig.tight_layout(rect=(0.07, 0.03, 1, 0.96), w_pad=1.0, h_pad=1.2)
     out = save_pdf(fig, "exp1_dice_curves")
     print(f"saved {out}")
     plt.close(fig)
